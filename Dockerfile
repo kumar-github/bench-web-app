@@ -14,20 +14,27 @@
 # on a plain, well-known JDK image is slightly slower on a cold cache but
 # doesn't depend on a specific third-party image's internal layout.
 FROM eclipse-temurin:21-jdk-jammy AS build
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends maven \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY pom.xml .
+ENV HOME=/app
+RUN mkdir -p $HOME
+
+# RUN apt-get update \
+#     && apt-get install -y --no-install-recommends maven \
+#     && rm -rf /var/lib/apt/lists/*
+
+# WORKDIR /app
+WORKDIR $HOME
+# COPY pom.xml .
+COPY pom.xml $HOME
 # Warm the Maven dependency cache in its own layer so a source-only change
 # doesn't force a full re-download on the next build.
 RUN mvn -B dependency:go-offline || true
-COPY src ./src
+COPY src $HOME/src
 RUN mvn -B clean package -DskipTests
 
 # Stage 2: run it on a slim JRE.
 FROM eclipse-temurin:21-jre-jammy
-WORKDIR /app
+# WORKDIR /app
+WORKDIR $HOME
 COPY --from=build /app/target/*.jar app.jar
 
 # Render/Railway/Fly all pass PORT at runtime; application.yml already reads
