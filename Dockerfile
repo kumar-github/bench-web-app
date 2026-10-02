@@ -27,9 +27,9 @@ WORKDIR $HOME
 COPY pom.xml $HOME
 # Warm the Maven dependency cache in its own layer so a source-only change
 # doesn't force a full re-download on the next build.
-RUN mvn -B dependency:go-offline || true
+RUN ./mvnw -B dependency:go-offline || true
 COPY src $HOME/src
-RUN mvn -B clean package -DskipTests
+RUN ./mvnw -B clean package -DskipTests
 
 # Stage 2: run it on a slim JRE.
 FROM eclipse-temurin:21-jre-jammy
