@@ -15,15 +15,482 @@
     font-size: var(--aura-font-size-s);
 }
 
-/* TODO: This is only for demo purposes. You can delete it. */
-vaadin-side-nav:has(vaadin-side-nav-item:only-child)::after {
-    display: block;
-    content: "More menu items will appear here when you add more views.";
-    font-size: var(--aura-font-size-s);
-    color: var(--vaadin-text-color-secondary);
+/* ==========================================================================================
+   Bench Match brand shell + dashboard — rebuilt to match the approved design mock
+   (Main.dc.html) pixel-for-pixel. This is a fixed, static brand palette (the mock itself has
+   no dark-mode variant), so these ".bm-*" rules intentionally use the mock's literal hex/px
+   values rather than Aura design tokens — a deliberate exception to "always use tokens",
+   because the goal here is matching an approved visual design exactly, not theme adaptivity.
+   Aura/Vaadin tokens are still used everywhere else (Supply/Demand/Upload/Shortlist keep the
+   stock look and do respond to the dark-mode Switch).
+   ========================================================================================== */
+
+:root {
+    --bm-navy: #15213b;
+    --bm-navy-active: #22314f;
+    --bm-gold: #d8a54b;
+    --bm-ink: #1c1f26;
+    --bm-muted-ink: #6b7280;
+    --bm-faint-ink: #9ca3af;
+    --bm-border: #e6e1d6;
+    --bm-border-faint: #f1eee6;
+    --bm-content-bg: #f6f4ef;
+    --bm-field-bg: #faf9f5;
+    --bm-amber-bg: #fdf3e3;
+    --bm-amber-ink: #6b4510;
+    --bm-amber-ink-strong: #8a5a14;
+    --bm-red-bg: #f7eaea;
+    --bm-red-ink: #8b3a3a;
+    --bm-red-strong: #9d5b5b;
+    --bm-teal: #0f766e;
+}
+
+.bm-shell {
+    display: flex;
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: var(--bm-ink);
+    background: var(--bm-content-bg);
+}
+
+/* ---- Sidebar ---- */
+
+.bm-sidebar {
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--bm-navy);
+    display: flex;
+    flex-direction: column;
+    padding: 26px 16px;
     box-sizing: border-box;
-    padding: 1em;
-    max-width: 14em;
-    min-width: 100%;
-    white-space: normal;
+}
+
+.bm-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 10px 26px 10px;
+}
+
+.bm-logo-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--bm-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--bm-navy);
+}
+
+.bm-brand {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: #ffffff;
+    letter-spacing: 0.2px;
+}
+
+.bm-navitem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    text-decoration: none;
+    color: #c7ccda;
+    cursor: pointer;
+}
+
+.bm-navitem:hover {
+    background: var(--bm-navy-active);
+}
+
+/* RouterLink's default highlight action toggles a `highlight` ATTRIBUTE (not a CSS class) —
+   https://vaadin.com/api/platform/current/com/vaadin/flow/router/RouterLink.html */
+.bm-navitem[highlight] {
+    background: var(--bm-navy-active);
+    color: #ffffff;
+}
+
+.bm-navitem[highlight] .bm-navlabel {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.bm-navitem-static {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.bm-navitem-static:hover {
+    background: transparent;
+}
+
+.bm-navicon {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.bm-navlabel {
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.bm-navlabel-flex {
+    flex: 1;
+}
+
+.soon-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #5e6b85;
+    border: 1px solid #2a3a5c;
+    border-radius: 4px;
+    padding: 2px 5px;
+}
+
+.bm-sidebar-spacer {
+    flex: 1;
+}
+
+.bm-version {
+    font-size: 11px;
+    color: #5e6b85;
+    padding: 14px 12px 2px;
+}
+
+/* ---- Content column + header ---- */
+
+.bm-content-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.bm-header {
+    height: 72px;
+    flex-shrink: 0;
+    background: #ffffff;
+    border-bottom: 1px solid var(--bm-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    box-sizing: border-box;
+}
+
+.bm-header-title {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.bm-header-right {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.bm-last-refreshed {
+    font-size: 12.5px;
+    color: var(--bm-muted-ink);
+}
+
+.bm-last-refreshed-value {
+    color: var(--bm-ink);
+    font-weight: 600;
+}
+
+/* vaadin-text-field's <input> lives in its own shadow DOM — a light-DOM "input" selector can't
+   reach it (the same mistake as the old `vaadin-drawer-panel` rule). Width is set from Java
+   instead (TextField#setWidth, a real public API); the rest is left as Aura's own stock look,
+   since this field is disabled/decorative only. */
+
+.bm-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--bm-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--bm-navy);
+}
+
+.bm-outlet {
+    flex: 1;
+    box-sizing: border-box;
+}
+
+/* ---- Dashboard view ---- */
+
+.bm-dash {
+    padding: 28px 32px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+}
+
+.bm-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.bm-kpi-tile {
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+.bm-kpi-tile-highlighted {
+    border: 2px solid var(--bm-gold);
+}
+
+.bm-kpi-tile-highlighted .bm-kpi-value,
+.bm-kpi-tile-highlighted .bm-kpi-caption {
+    color: var(--bm-amber-ink-strong);
+}
+
+.bm-kpi-tile-muted .bm-kpi-caption {
+    color: var(--bm-faint-ink);
+    font-size: 11.5px;
+}
+
+.bm-kpi-label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--bm-muted-ink);
+    font-weight: 500;
+}
+
+.bm-kpi-value {
+    display: block;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 30px;
+    margin-top: 6px;
+}
+
+.bm-kpi-caption {
+    display: block;
+    font-size: 12px;
+    color: var(--bm-muted-ink);
+    margin-top: 4px;
+}
+
+.bm-kpi-caption-teal {
+    color: var(--bm-teal);
+}
+
+.bm-dash-middle-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.bm-card {
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+}
+
+/* "Your queue"-style header: big Manrope title, used only for the needs-attention card. */
+.bm-card-title-lg {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+/* Plain small card header, used for every other card (match quality, etc). */
+.bm-card-title {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.bm-card-subtitle {
+    font-size: 12px;
+    color: var(--bm-faint-ink);
+    margin-top: 2px;
+}
+
+.bm-queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.bm-pbtn {
+    background: var(--bm-gold);
+    color: var(--bm-navy);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-family: 'Manrope', sans-serif;
+    text-decoration: none;
+}
+
+.bm-pbtn:hover {
+    opacity: 0.9;
+}
+
+.bm-queue-rows {
+    border: 1px solid var(--bm-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.bm-queue-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    border-left: 3px solid var(--bm-red-strong);
+    border-bottom: 1px solid var(--bm-border-faint);
+}
+
+.bm-queue-row:hover {
+    background: var(--bm-field-bg);
+}
+
+.bm-queue-row:last-child {
+    border-bottom: none;
+}
+
+.bm-queue-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--bm-border-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.bm-queue-name-line {
+    flex: 1;
+    min-width: 0;
+}
+
+.bm-queue-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.bm-queue-meta {
+    font-weight: 500;
+    color: var(--bm-faint-ink);
+    font-size: 11.5px;
+}
+
+.bm-badge-danger {
+    background: var(--bm-red-bg);
+    color: var(--bm-red-ink);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.bm-queue-open {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bm-navy);
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+.bm-queue-more {
+    font-size: 11.5px;
+    color: var(--bm-faint-ink);
+    text-align: center;
+}
+
+.bm-queue-reconciliation {
+    font-size: 11px;
+    color: #b8bcc6;
+    text-align: center;
+    border-top: 1px solid var(--bm-border-faint);
+    padding-top: 8px;
+}
+
+.bm-quality-bar {
+    display: flex;
+    height: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+    background: var(--bm-border-faint);
+}
+
+.bm-quality-bar-empty {
+    height: auto;
+    min-height: 14px;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 0;
+}
+
+.bm-quality-bar-empty-label {
+    font-size: 11px;
+    color: var(--bm-faint-ink);
+}
+
+.bm-quality-segment {
+    height: 100%;
+}
+
+.bm-quality-strong {
+    background: var(--bm-teal);
+}
+
+.bm-quality-good {
+    background: var(--bm-gold);
+}
+
+.bm-quality-weak {
+    background: var(--bm-red-strong);
+}
+
+.bm-quality-legend {
+    display: flex;
+    gap: 18px;
+}
+
+.bm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #374151;
+}
+
+.bm-legend-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    display: inline-block;
 }

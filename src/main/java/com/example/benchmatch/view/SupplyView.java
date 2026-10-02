@@ -9,7 +9,6 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.router.RouteAlias;
 
 /**
  * Grid over supply_enriched (bench employees), reading through SupplyQueryService — the same filter logic the REST
@@ -17,9 +16,11 @@ import com.vaadin.flow.router.RouteAlias;
  * (case-insensitive for persona/subPersona/classificationStatus, exact for location), applied on demand via a
  * "Search" button rather than on every keystroke, since a full re-filter re-runs the in-memory scan over every
  * active row.
+ * <p>
+ * No longer the landing page as of the Dashboard view (2026-10-02) — {@code ""} now routes to
+ * {@link DashboardView}.
  */
 @Route(value = "supply", layout = MainLayout.class)
-@RouteAlias(value = "", layout = MainLayout.class)
 @PageTitle("Supply")
 public class SupplyView extends VerticalLayout {
 

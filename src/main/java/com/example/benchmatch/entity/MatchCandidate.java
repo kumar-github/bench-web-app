@@ -91,4 +91,12 @@ public class MatchCandidate {
     public String getOneLiner() {
         return oneLiner;
     }
+
+    public Long getRunId() {
+        return runId;
+    }
+
+    public void setRunId(Long runId) {
+        this.runId = runId;
+    }
 }
