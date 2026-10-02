@@ -1,0 +1,14 @@
+package com.example.benchmatch.repository;
+
+import com.example.benchmatch.entity.MatchCandidate;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface MatchCandidateRepository extends JpaRepository<MatchCandidate, Long> {
+    List<MatchCandidate> findByEmployeeId(Long employeeId);
+
+    List<MatchCandidate> findByDemandId(String demandId);
+}

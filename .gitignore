@@ -84,7 +84,6 @@ maven-eclipse.xml
 
 # Local repository cache directories (various naming conventions)
 .m2/
-repository/
 .mvn/
 maven/
 .maven/
