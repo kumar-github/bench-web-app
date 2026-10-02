@@ -13,7 +13,8 @@
 # has no Docker daemon to test image tags against. Installing Maven via apt
 # on a plain, well-known JDK image is slightly slower on a cold cache but
 # doesn't depend on a specific third-party image's internal layout.
-FROM eclipse-temurin:21-jdk-jammy AS build
+# FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:21-jdk AS build
 ENV HOME=/app
 RUN mkdir -p $HOME
 
