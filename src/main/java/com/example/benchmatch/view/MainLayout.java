@@ -112,6 +112,13 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         if (content != null) {
             outlet.getElement().appendChild(content.getElement());
             headerTitle.setText(pageTitleOf(content));
+            // Marks the shell itself with which route is showing, so styles.css's dark-mode
+            // block can skip entirely for Dashboard — ".bm-header" is shared by every route
+            // (it lives here, not in DashboardView), so without this marker it would flip dark
+            // while ".bm-dash" below it stays pinned light, splitting the page in two. With the
+            // marker, Dashboard stays fully light (header included) and every other route flips
+            // fully dark (header included) — see ":not(.bm-dashboard-route)" in styles.css.
+            setClassName("bm-dashboard-route", content instanceof DashboardView);
         }
     }
 

@@ -538,25 +538,32 @@
    which is why there's no override for them here). `.bm-dash` and everything under it is
    intentionally absent from this block: it pins itself to the light mock palette above and
    must stay that way regardless of theme.
+
+   Every selector below is qualified with ":not(.bm-dashboard-route)". `.bm-header` is shared
+   by every route — it lives in MainLayout, not in DashboardView — so without this guard it
+   would flip dark while on the Dashboard even though ".bm-dash" beneath it stays pinned light,
+   splitting the page into a dark top bar over a light body. MainLayout toggles
+   "bm-dashboard-route" on the shell itself in showRouterLayoutContent(), so the guard disables
+   this entire block (header included) whenever Dashboard is the route showing.
    ========================================================================================== */
 
-:root[theme~="dark"] .bm-shell {
+:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) {
     background: #1a1d24;
 }
 
-:root[theme~="dark"] .bm-header {
+:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-header {
     background: #20242c;
     border-bottom-color: #343a46;
 }
 
-:root[theme~="dark"] .bm-header-title {
+:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-header-title {
     color: #f3f1ea;
 }
 
-:root[theme~="dark"] .bm-last-refreshed {
+:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-last-refreshed {
     color: #9aa0ad;
 }
 
-:root[theme~="dark"] .bm-last-refreshed-value {
+:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-last-refreshed-value {
     color: #e7e4db;
 }
