@@ -23,6 +23,23 @@
    because the goal here is matching an approved visual design exactly, not theme adaptivity.
    Aura/Vaadin tokens are still used everywhere else (Supply/Demand/Upload/Shortlist keep the
    stock look and do respond to the dark-mode Switch).
+
+   Dark mode scope (decided 2026-10-02): the shell (sidebar/header/content background) and the
+   stock Aura views (Supply/Demand/Upload/Shortlist) now get a real dark variant, gated behind
+   the `theme="dark"` attribute Page#setColorScheme sets on <html>. The Dashboard route is
+   intentionally exempted — `.bm-dash` pins itself to the mock's literal light colors
+   regardless of theme, both because nobody has designed a dark Dashboard yet and because its
+   ".bm-kpi-tile"/".bm-card"/etc. children are white cards that were never scoped to adapt.
+   See the "---- Dark mode ----" block near the bottom of this file for every override.
+
+   This block also fixes a real bug, not just a design gap: `.bm-shell` used to set
+   `color: var(--bm-ink)` globally, and plain CSS `color` is inherited across the shadow-DOM
+   boundary into any component that doesn't set its own (e.g. Grid's cell text). That pinned
+   Grid/VerticalLayout/etc. text to the mock's always-dark ink color even when Aura's own
+   background correctly went dark, making grid rows unreadable (dark text on dark background).
+   Fix: `.bm-shell` no longer sets `color` at all — content outside `.bm-dash` now inherits
+   Aura's own adaptive text color — and `.bm-dash`/`.bm-header-title` set the mock's ink color
+   explicitly instead of relying on inheriting it from the shell.
    ========================================================================================== */
 
 :root {
@@ -48,7 +65,9 @@
 .bm-shell {
     display: flex;
     font-family: 'IBM Plex Sans', sans-serif;
-    color: var(--bm-ink);
+    /* No `color` here on purpose — see the file header comment. Content outside `.bm-dash`
+       (Supply/Demand/Upload/Shortlist) inherits Aura's own adaptive text color instead of a
+       hardcoded ink that would stay dark even when the background goes dark. */
     background: var(--bm-content-bg);
 }
 
@@ -189,6 +208,9 @@
     font-family: 'Manrope', sans-serif;
     font-weight: 700;
     font-size: 20px;
+    /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment.
+       Overridden for dark mode below. */
+    color: var(--bm-ink);
 }
 
 .bm-header-right {
@@ -229,6 +251,11 @@
 .bm-outlet {
     flex: 1;
     box-sizing: border-box;
+    /* Gives .bm-dash's `min-height: 100%` below something to resolve against, so its pinned
+       light background fully covers the outlet even when the dashboard's own content is
+       shorter than the viewport (otherwise a dark .bm-shell background could show through
+       below a short Dashboard page). */
+    min-height: 0;
 }
 
 /* ---- Dashboard view ---- */
@@ -239,6 +266,12 @@
     flex-direction: column;
     gap: 20px;
     box-sizing: border-box;
+    min-height: 100%;
+    /* Pinned explicitly (not inherited) so the Dashboard stays the mock's exact light palette
+       no matter what theme="dark" does to the shared shell around it — see file header
+       comment. These two lines are the entire reason Dashboard is exempt from dark mode. */
+    background: var(--bm-content-bg);
+    color: var(--bm-ink);
 }
 
 .bm-kpi-row {
@@ -493,4 +526,37 @@
     height: 9px;
     border-radius: 2px;
     display: inline-block;
+}
+
+/* ==========================================================================================
+   ---- Dark mode (shell + stock Aura views only — Dashboard is pinned light above) ----
+
+   Page#setColorScheme toggles the `theme="dark"` attribute on <html>, which is what these
+   selectors key off. Scope deliberately stops at the shell chrome (sidebar/header/content
+   background) plus letting Aura's own components do what they already do automatically
+   (Grid, Button, TextField, etc. all ship real dark tokens — nothing extra needed for those,
+   which is why there's no override for them here). `.bm-dash` and everything under it is
+   intentionally absent from this block: it pins itself to the light mock palette above and
+   must stay that way regardless of theme.
+   ========================================================================================== */
+
+:root[theme~="dark"] .bm-shell {
+    background: #1a1d24;
+}
+
+:root[theme~="dark"] .bm-header {
+    background: #20242c;
+    border-bottom-color: #343a46;
+}
+
+:root[theme~="dark"] .bm-header-title {
+    color: #f3f1ea;
+}
+
+:root[theme~="dark"] .bm-last-refreshed {
+    color: #9aa0ad;
+}
+
+:root[theme~="dark"] .bm-last-refreshed-value {
+    color: #e7e4db;
 }

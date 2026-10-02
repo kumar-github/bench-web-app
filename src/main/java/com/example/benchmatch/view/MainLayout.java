@@ -37,11 +37,14 @@ import java.util.Objects;
  * "navitem-static" treatment with a SOON badge. "Shortlist" has no equivalent in the mock (it
  * predates this view) — it reuses a plain custom list icon, not one from the approved design.
  * <p>
- * The mock itself is a fixed light palette with a permanently-dark sidebar — it has no dark-mode
- * variant. The dark/light Switch here still flips {@code Page.setColorScheme} (so Aura's stock
- * chrome on Supply/Demand/Upload/Shortlist still responds), but this shell's own ".bm-*" classes
- * use the mock's literal colors rather than Aura tokens, so the shell itself won't visually
- * change with the switch — matching the mock takes priority over a dark variant nobody designed.
+ * The mock itself is a fixed light palette with a permanently-dark sidebar and no dark-mode
+ * variant of its own. As of 2026-10-02 the dark/light Switch flips {@code Page.setColorScheme}
+ * AND the shell chrome (sidebar/header/content background, see styles.css's
+ * ":root[theme~='dark']" block) now has a real dark variant, on top of Aura's stock components
+ * (Grid, Button, etc. on Supply/Demand/Upload/Shortlist) which already respond on their own.
+ * The Dashboard route remains the one deliberate exception — its ".bm-dash" container pins
+ * itself to the mock's literal light colors regardless of theme, since nobody has designed a
+ * dark version of its KPI tiles/cards yet.
  */
 public class MainLayout extends FlexLayout implements RouterLayout {
 
@@ -206,7 +209,7 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         search.addClassName("bm-search");
 
         Switch darkModeSwitch = new Switch();
-        darkModeSwitch.getElement().setProperty("title", "Dark mode (affects Supply/Demand/Upload screens)");
+        darkModeSwitch.getElement().setProperty("title", "Dark mode (affects everything except Dashboard)");
         darkModeSwitch.setValue(isDarkModeActive());
         darkModeSwitch.addValueChangeListener(event -> applyColorScheme(event.getValue()));
 
