@@ -9,5 +9,4 @@ import java.util.List;
 @Repository
 public interface DemandEnrichedRepository extends JpaRepository<DemandEnriched, String> {
     List<DemandEnriched> findByIsActiveTrue();
-
 }
