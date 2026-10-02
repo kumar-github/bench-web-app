@@ -1,0 +1,32 @@
+# Render "Blueprint" — lets Render provision the web service + free Postgres
+# together from this one file, instead of clicking through both manually.
+# In Render: New -> Blueprint -> point at this repo -> Apply.
+#
+# If you'd rather click through manually (also fine, see DEPLOY.md), this
+# file is ignored and you just create the two resources by hand with the
+# same settings shown below.
+services:
+  - type: web
+    name: bench-match-webapp
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: bench-match-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: bench-match-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: bench-match-db
+          property: password
+
+databases:
+  - name: bench-match-db
+    plan: free
+    # Free Render Postgres instances expire after 90 days — fine for a UX
+    # trial run, not for anything you want to keep. See DEPLOY.md.
