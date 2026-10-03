@@ -8,7 +8,9 @@ spring:
     # SPRING_DATASOURCE_URL/USERNAME/PASSWORD as real env vars, which Spring
     # Boot's relaxed binding picks up automatically — no code change needed
     # per environment). See DEPLOY.md for exactly what to set where.
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/demand_supply_mapping_db}
+    #    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/demand_supply_mapping_db}
+    #    url: ${DATABASE_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/demand_supply_mapping_db}}
+    url: ${DATABASE_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/demand_supply_mapping_db}}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
 
