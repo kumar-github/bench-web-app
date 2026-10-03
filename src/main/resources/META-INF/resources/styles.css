@@ -17,29 +17,26 @@
 
 /* ==========================================================================================
    Bench Match brand shell + dashboard — rebuilt to match the approved design mock
-   (Main.dc.html) pixel-for-pixel. This is a fixed, static brand palette (the mock itself has
-   no dark-mode variant), so these ".bm-*" rules intentionally use the mock's literal hex/px
-   values rather than Aura design tokens — a deliberate exception to "always use tokens",
-   because the goal here is matching an approved visual design exactly, not theme adaptivity.
-   Aura/Vaadin tokens are still used everywhere else (Supply/Demand/Upload/Shortlist keep the
-   stock look and do respond to the dark-mode Switch).
+   (Main.dc.html) pixel-for-pixel. This is a fixed, static brand palette, so these ".bm-*"
+   rules intentionally use the mock's literal hex/px values rather than Aura design tokens — a
+   deliberate exception to "always use tokens", because the goal here is matching an approved
+   visual design exactly, not theme adaptivity. Aura/Vaadin tokens are still used everywhere
+   else (Supply/Demand/Upload/Shortlist keep the stock look).
 
-   Dark mode scope (decided 2026-10-02): the shell (sidebar/header/content background) and the
-   stock Aura views (Supply/Demand/Upload/Shortlist) now get a real dark variant, gated behind
-   the `theme="dark"` attribute Page#setColorScheme sets on <html>. The Dashboard route is
-   intentionally exempted — `.bm-dash` pins itself to the mock's literal light colors
-   regardless of theme, both because nobody has designed a dark Dashboard yet and because its
-   ".bm-kpi-tile"/".bm-card"/etc. children are white cards that were never scoped to adapt.
-   See the "---- Dark mode ----" block near the bottom of this file for every override.
+   A dark-mode toggle (shell + stock Aura views getting a real dark variant via
+   Page#setColorScheme / the `theme="dark"` attribute) existed briefly (2026-10-02/03) but was
+   removed entirely (2026-10-03) per a deliberate decision to drop the feature rather than
+   finish it for the Dashboard route too. There is no color-scheme switching left anywhere in
+   this app — light-only, matching the mock.
 
-   This block also fixes a real bug, not just a design gap: `.bm-shell` used to set
+   One real bug fix from that period is still worth keeping noted: `.bm-shell` used to set
    `color: var(--bm-ink)` globally, and plain CSS `color` is inherited across the shadow-DOM
    boundary into any component that doesn't set its own (e.g. Grid's cell text). That pinned
-   Grid/VerticalLayout/etc. text to the mock's always-dark ink color even when Aura's own
-   background correctly went dark, making grid rows unreadable (dark text on dark background).
-   Fix: `.bm-shell` no longer sets `color` at all — content outside `.bm-dash` now inherits
-   Aura's own adaptive text color — and `.bm-dash`/`.bm-header-title` set the mock's ink color
-   explicitly instead of relying on inheriting it from the shell.
+   Grid/VerticalLayout/etc. text to the mock's ink color regardless of Aura's own background,
+   which was fine in a light-only app but would have made grid rows unreadable under the old
+   dark-mode attempt. Fix (kept): `.bm-shell` no longer sets `color` at all — content outside
+   `.bm-dash` inherits Aura's own text color — and `.bm-dash`/`.bm-header-title` set the mock's
+   ink color explicitly instead of relying on inheriting it from the shell.
    ========================================================================================== */
 
 :root {
@@ -208,8 +205,7 @@
     font-family: 'Manrope', sans-serif;
     font-weight: 700;
     font-size: 20px;
-    /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment.
-       Overridden for dark mode below. */
+    /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment. */
     color: var(--bm-ink);
 }
 
@@ -251,10 +247,9 @@
 .bm-outlet {
     flex: 1;
     box-sizing: border-box;
-    /* Gives .bm-dash's `min-height: 100%` below something to resolve against, so its pinned
-       light background fully covers the outlet even when the dashboard's own content is
-       shorter than the viewport (otherwise a dark .bm-shell background could show through
-       below a short Dashboard page). */
+    /* Gives .bm-dash's `min-height: 100%` below something to resolve against, so its background
+       fully covers the outlet even when the dashboard's own content is shorter than the
+       viewport. */
     min-height: 0;
 }
 
@@ -267,9 +262,8 @@
     gap: 20px;
     box-sizing: border-box;
     min-height: 100%;
-    /* Pinned explicitly (not inherited) so the Dashboard stays the mock's exact light palette
-       no matter what theme="dark" does to the shared shell around it — see file header
-       comment. These two lines are the entire reason Dashboard is exempt from dark mode. */
+    /* Explicit (not inherited) so the Dashboard always shows the mock's exact light palette —
+       see file header comment. */
     background: var(--bm-content-bg);
     color: var(--bm-ink);
 }
@@ -526,44 +520,4 @@
     height: 9px;
     border-radius: 2px;
     display: inline-block;
-}
-
-/* ==========================================================================================
-   ---- Dark mode (shell + stock Aura views only — Dashboard is pinned light above) ----
-
-   Page#setColorScheme toggles the `theme="dark"` attribute on <html>, which is what these
-   selectors key off. Scope deliberately stops at the shell chrome (sidebar/header/content
-   background) plus letting Aura's own components do what they already do automatically
-   (Grid, Button, TextField, etc. all ship real dark tokens — nothing extra needed for those,
-   which is why there's no override for them here). `.bm-dash` and everything under it is
-   intentionally absent from this block: it pins itself to the light mock palette above and
-   must stay that way regardless of theme.
-
-   Every selector below is qualified with ":not(.bm-dashboard-route)". `.bm-header` is shared
-   by every route — it lives in MainLayout, not in DashboardView — so without this guard it
-   would flip dark while on the Dashboard even though ".bm-dash" beneath it stays pinned light,
-   splitting the page into a dark top bar over a light body. MainLayout toggles
-   "bm-dashboard-route" on the shell itself in showRouterLayoutContent(), so the guard disables
-   this entire block (header included) whenever Dashboard is the route showing.
-   ========================================================================================== */
-
-:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) {
-    background: #1a1d24;
-}
-
-:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-header {
-    background: #20242c;
-    border-bottom-color: #343a46;
-}
-
-:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-header-title {
-    color: #f3f1ea;
-}
-
-:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-last-refreshed {
-    color: #9aa0ad;
-}
-
-:root[theme~="dark"] .bm-shell:not(.bm-dashboard-route) .bm-last-refreshed-value {
-    color: #e7e4db;
 }

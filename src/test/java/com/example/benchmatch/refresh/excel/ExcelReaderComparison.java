@@ -6,21 +6,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Standalone (no JUnit/Spring) harness that runs {@link PoiExcelRowReader} and {@link FastExcelRowReader} against
- * the same real .xlsx file and reports every difference between them -- the actual check to run before trusting
+ * Standalone (no JUnit/Spring) harness that runs {@link PoiExcelRowReader} and {@link FastExcelRowReader} against the
+ * same real .xlsx file and reports every difference between them -- the actual check to run before trusting
  * {@code EXCEL_READER_IMPL=fastexcel} in production, rather than taking the javadoc caveats in
  * {@code FastExcelRowReader} on faith.
  * <p>
- * Needs both Apache POI (poi-ooxml) and fastexcel-reader on the classpath, so (same caveat as
- * RefreshLogicVerification) it can't run in a sandbox without Maven Central -- run it on a real machine:
+ * Needs both Apache POI (poi-ooxml) and fastexcel-reader on the classpath, so (same caveat as RefreshLogicVerification)
+ * it can't run in a sandbox without Maven Central -- run it on a real machine:
  * <p>
- * cd bench-match-webapp
- * mvn -q dependency:build-classpath -Dmdep.outputFile=cp.txt
- * javac -d out -cp "$(cat cp.txt)" \
- *   src/main/java/com/example/benchmatch/refresh/excel/*.java \
- *   src/test/java/com/example/benchmatch/refresh/excel/ExcelReaderComparison.java
- * java -cp "out:$(cat cp.txt)" com.example.benchmatch.refresh.excel.ExcelReaderComparison \
- *   ../AFD-Supply.xlsx ../Demand.xlsx ../AAFD-Supply.xlsx
+ * cd bench-match-webapp mvn -q dependency:build-classpath -Dmdep.outputFile=cp.txt javac -d out -cp "$(cat cp.txt)" \
+ * src/main/java/com/example/benchmatch/refresh/excel/*.java \
+ * src/test/java/com/example/benchmatch/refresh/excel/ExcelReaderComparison.java java -cp "out:$(cat cp.txt)"
+ * com.example.benchmatch.refresh.excel.ExcelReaderComparison \ ../AFD-Supply.xlsx ../Demand.xlsx ../AAFD-Supply.xlsx
  * <p>
  * (any number of file paths; each is checked independently and the run exits non-zero if any file disagrees.)
  */
@@ -43,8 +40,8 @@ public class ExcelReaderComparison {
         System.out.println(allIdentical
                 ? "RESULT: IDENTICAL — PoiExcelRowReader and FastExcelRowReader agree on every file given."
                 : "RESULT: DIFFERENCES FOUND — see above. Do not switch EXCEL_READER_IMPL=fastexcel for an "
-                        + "affected file until these are understood (likely the FORMULA/ERROR-cell caveats "
-                        + "documented in FastExcelRowReader's javadoc, if the file actually has formula cells).");
+                + "affected file until these are understood (likely the FORMULA/ERROR-cell caveats "
+                + "documented in FastExcelRowReader's javadoc, if the file actually has formula cells).");
         if (!allIdentical) {
             System.exit(1);
         }

@@ -21,9 +21,9 @@ import java.util.Map;
  * <p>
  * 2. Multipart {@code /upload} endpoints (added for task #18) — accept the Excel file itself in the request body, for
  * any external consumer (curl/Postman/another service) that isn't the Vaadin UI. The Vaadin upload view
- * ({@code com.example.benchmatch.view.UploadView}) does NOT call these over HTTP; per this app's own architecture
- * (see BenchMatchApplication's Javadoc — "Vaadin views call the service layer in-process"), it calls
- * {@link RefreshService} directly. These multipart endpoints exist for everyone else.
+ * ({@code com.example.benchmatch.view.UploadView}) does NOT call these over HTTP; per this app's own architecture (see
+ * BenchMatchApplication's Javadoc — "Vaadin views call the service layer in-process"), it calls {@link RefreshService}
+ * directly. These multipart endpoints exist for everyone else.
  */
 @RestController
 public class RefreshController {
@@ -68,10 +68,10 @@ public class RefreshController {
 
     /**
      * Multipart uploads arrive as an in-memory/temp-backed {@link MultipartFile}, but RefreshService (and the Apache
-     * POI reader underneath it, via ExcelSheetReader) needs a real {@link Path}. Stages the upload into a
-     * process-temp file under a dedicated prefix, deleted again in a {@code finally} block once the refresh
-     * finishes (success or failure) — nothing downstream needs the file after the DB write, and
-     * {@code deleteOnExit} alone would leak files for the life of a long-running server.
+     * POI reader underneath it, via ExcelSheetReader) needs a real {@link Path}. Stages the upload into a process-temp
+     * file under a dedicated prefix, deleted again in a {@code finally} block once the refresh finishes (success or
+     * failure) — nothing downstream needs the file after the DB write, and {@code deleteOnExit} alone would leak files
+     * for the life of a long-running server.
      */
     private Path stageUpload(MultipartFile file) {
         String original = file.getOriginalFilename();

@@ -35,10 +35,10 @@
 -- backfill on the next refresh either way.
 
 ALTER TABLE demand_enriched
-    ADD COLUMN customer     TEXT,
+    ADD COLUMN customer TEXT,
     ADD COLUMN project_name TEXT,
     ADD COLUMN new_ageing   TEXT;
 
 ALTER TABLE supply_enriched
-    ADD COLUMN prime_nv           TEXT,
+    ADD COLUMN prime_nv TEXT,
     ADD COLUMN classification_note TEXT;

@@ -19,4 +19,4 @@
 -- the next refresh once source_row_hash is nulled, same as every other classification/raw column.
 
 ALTER TABLE supply_enriched
-    ADD COLUMN mas_mapping_raw TEXT;  -- 'MAS Mapping' column, kept verbatim, NEVER used to filter/match beyond the existing Phase 1 scope gate
+    ADD COLUMN mas_mapping_raw TEXT; -- 'MAS Mapping' column, kept verbatim, NEVER used to filter/match beyond the existing Phase 1 scope gate

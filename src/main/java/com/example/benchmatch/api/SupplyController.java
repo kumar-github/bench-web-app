@@ -9,11 +9,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Read API over supply_enriched. Filtering is delegated to {@link SupplyQueryService} (extracted 2026-09-30, task
- * #18) so the Vaadin SupplyView reuses the exact same in-memory filter logic in-process rather than duplicating it.
- * Filtering itself is still done in memory rather than as JPA Specifications/query derivation — deliberately, for
- * now: it's simpler to read and trust at this data volume. Worth revisiting as real database-level filtering +
- * pagination if/when scope grows (AAFD, multiple companies, etc.) past a few thousand rows.
+ * Read API over supply_enriched. Filtering is delegated to {@link SupplyQueryService} (extracted 2026-09-30, task #18)
+ * so the Vaadin SupplyView reuses the exact same in-memory filter logic in-process rather than duplicating it.
+ * Filtering itself is still done in memory rather than as JPA Specifications/query derivation — deliberately, for now:
+ * it's simpler to read and trust at this data volume. Worth revisiting as real database-level filtering + pagination
+ * if/when scope grows (AAFD, multiple companies, etc.) past a few thousand rows.
  */
 @RestController
 @RequestMapping("/api/supply")

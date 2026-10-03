@@ -271,14 +271,12 @@ public final class RefreshLogic {
     /**
      * Mirrors mas_mapping_check() in classify_inputs.py. Validation-only.
      * <p>
-     * Narrowed 2026-10-01: this used to ALSO return true for any masMappingRaw outside
-     * Engine.PHASE1_MAS_MAPPING ("outside Phase 1 values"). That branch is now dead code by
-     * construction — classifyDemand()'s new MAS Mapping scope gate already clears persona and sets
-     * an explicit OUT OF PHASE 1 SCOPE status for exactly those rows before this method ever runs on
-     * them, so {@code persona == null} below already catches them. Keeping the old branch would have
-     * double-reported the same thing two different ways for every excluded row. This method now does
-     * one job: among rows already in active scope, does MAS Mapping privately agree with the
-     * engine-derived persona.
+     * Narrowed 2026-10-01: this used to ALSO return true for any masMappingRaw outside Engine.PHASE1_MAS_MAPPING
+     * ("outside Phase 1 values"). That branch is now dead code by construction — classifyDemand()'s new MAS Mapping
+     * scope gate already clears persona and sets an explicit OUT OF PHASE 1 SCOPE status for exactly those rows before
+     * this method ever runs on them, so {@code persona == null} below already catches them. Keeping the old branch
+     * would have double-reported the same thing two different ways for every excluded row. This method now does one
+     * job: among rows already in active scope, does MAS Mapping privately agree with the engine-derived persona.
      */
     public static boolean masMappingCheck(String masMappingRaw, String persona) {
         if (persona == null) {

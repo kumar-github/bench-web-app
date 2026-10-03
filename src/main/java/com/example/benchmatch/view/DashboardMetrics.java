@@ -18,18 +18,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Backs {@link DashboardView}. Everything here is computed directly from existing tables
- * (supply_enriched / demand_enriched / match_candidates / refresh_runs) — there is deliberately
- * no invented number on this dashboard.
+ * Backs {@link DashboardView}. Everything here is computed directly from existing tables (supply_enriched /
+ * demand_enriched / match_candidates / refresh_runs) — there is deliberately no invented number on this dashboard.
  * <p>
- * One real gap this surfaces: the mockup's "Awaiting review" / "128 of 243 reviewed" / "4 days
- * left in cycle" widget assumes a reviewer-workflow state (demand_review_state) that doesn't
- * exist in this codebase yet (no entity, no table — see the readme's "Status as of this
- * handoff"). Rather than fabricate those numbers, this service reports what IS real and
- * derivable today: which active, classified employees have no Strong/Good match at all in the
- * latest matching run. That's a genuinely useful "needs attention" signal on its own, just not
- * the same thing as a reviewer's open/closed queue — the queue widget and progress bar will need
- * a real rebuild once demand_review_state exists.
+ * One real gap this surfaces: the mockup's "Awaiting review" / "128 of 243 reviewed" / "4 days left in cycle" widget
+ * assumes a reviewer-workflow state (demand_review_state) that doesn't exist in this codebase yet (no entity, no table
+ * — see the readme's "Status as of this handoff"). Rather than fabricate those numbers, this service reports what IS
+ * real and derivable today: which active, classified employees have no Strong/Good match at all in the latest matching
+ * run. That's a genuinely useful "needs attention" signal on its own, just not the same thing as a reviewer's
+ * open/closed queue — the queue widget and progress bar will need a real rebuild once demand_review_state exists.
  */
 @Service
 public class DashboardMetrics {
@@ -42,13 +39,26 @@ public class DashboardMetrics {
     private final RefreshRunRepository refreshRunRepository;
 
     public DashboardMetrics(SupplyEnrichedRepository supplyRepository,
-                             DemandEnrichedRepository demandRepository,
-                             MatchCandidateRepository matchCandidateRepository,
-                             RefreshRunRepository refreshRunRepository) {
+                            DemandEnrichedRepository demandRepository,
+                            MatchCandidateRepository matchCandidateRepository,
+                            RefreshRunRepository refreshRunRepository) {
         this.supplyRepository = supplyRepository;
         this.demandRepository = demandRepository;
         this.matchCandidateRepository = matchCandidateRepository;
         this.refreshRunRepository = refreshRunRepository;
+    }
+
+    private static String betterTier(String a, String b) {
+        return rank(a) >= rank(b) ? a : b;
+    }
+
+    private static int rank(String tier) {
+        return switch (tier) {
+            case "Strong" -> 3;
+            case "Good" -> 2;
+            case "Weak" -> 1;
+            default -> 0; // Excluded, or anything unexpected
+        };
     }
 
     public Snapshot load() {
@@ -113,19 +123,6 @@ public class DashboardMetrics {
                 needsAttention,
                 lastRefreshedAt
         );
-    }
-
-    private static String betterTier(String a, String b) {
-        return rank(a) >= rank(b) ? a : b;
-    }
-
-    private static int rank(String tier) {
-        return switch (tier) {
-            case "Strong" -> 3;
-            case "Good" -> 2;
-            case "Weak" -> 1;
-            default -> 0; // Excluded, or anything unexpected
-        };
     }
 
     public record QueueRow(Long employeeId, String employeeName, String band, String location) {

@@ -1,10 +1,6 @@
 package com.example.benchmatch.refresh.excel;
 
-import org.dhatim.fastexcel.reader.Cell;
-import org.dhatim.fastexcel.reader.CellType;
-import org.dhatim.fastexcel.reader.ReadableWorkbook;
-import org.dhatim.fastexcel.reader.Row;
-import org.dhatim.fastexcel.reader.Sheet;
+import org.dhatim.fastexcel.reader.*;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -18,19 +14,19 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Low-memory replacement for {@link PoiExcelRowReader}, added 2026-10-02 after a real OutOfMemoryError on
- * Render's free tier (POI's DOM-based {@code XSSFWorkbook} loading the whole workbook as an in-memory XML tree —
- * see DEPLOY.md, "Known fix #2"). Uses {@code org.dhatim:fastexcel-reader}, which streams rows instead of building
- * that tree. See {@link ExcelRowReaders} for how this is switched on, and {@code ExcelReaderComparison} (in
- * src/test) for the tool used to verify this reader produces the same output as {@link PoiExcelRowReader} on your
- * real workbooks before relying on it in production.
+ * Low-memory replacement for {@link PoiExcelRowReader}, added 2026-10-02 after a real OutOfMemoryError on Render's free
+ * tier (POI's DOM-based {@code XSSFWorkbook} loading the whole workbook as an in-memory XML tree — see DEPLOY.md,
+ * "Known fix #2"). Uses {@code org.dhatim:fastexcel-reader}, which streams rows instead of building that tree. See
+ * {@link ExcelRowReaders} for how this is switched on, and {@code ExcelReaderComparison} (in src/test) for the tool
+ * used to verify this reader produces the same output as {@link PoiExcelRowReader} on your real workbooks before
+ * relying on it in production.
  * <p>
  * <b>Verified against the real project files before this was written</b> (2026-10-02, via openpyxl against
- * Demand.xlsx / AFD-Supply.xlsx / AAFD-Supply.xlsx): zero formula cells and zero genuine date-typed cells in any
- * of them. That matters because it's exactly where this implementation's fidelity to {@link PoiExcelRowReader} is
- * weakest — see the two caveats below. For the data this project actually has today, those paths should never be
- * exercised. If a future source file *does* carry formulas or real Excel date cells, re-run the comparison tool
- * against it before trusting this reader on it.
+ * Demand.xlsx / AFD-Supply.xlsx / AAFD-Supply.xlsx): zero formula cells and zero genuine date-typed cells in any of
+ * them. That matters because it's exactly where this implementation's fidelity to {@link PoiExcelRowReader} is weakest
+ * — see the two caveats below. For the data this project actually has today, those paths should never be exercised. If
+ * a future source file *does* carry formulas or real Excel date cells, re-run the comparison tool against it before
+ * trusting this reader on it.
  * <ul>
  *   <li><b>Formula cells (untested, no coverage in real data):</b> FastExcel's reader (confirmed from its own
  *       {@code Cell.java} source) exposes a formula cell's cached numeric result via {@code getRawValue()}
@@ -65,50 +61,6 @@ import java.util.stream.Stream;
 public final class FastExcelRowReader implements ExcelRowReader {
 
     private static final DecimalFormat WHOLE_NUMBER = new DecimalFormat("#");
-
-    @Override
-    public List<Map<String, String>> readFirstSheet(Path xlsxPath) throws IOException {
-        try (InputStream in = new FileInputStream(xlsxPath.toFile());
-             ReadableWorkbook wb = new ReadableWorkbook(in)) {
-            Sheet sheet = wb.getFirstSheet();
-
-            List<Map<String, String>> rows = new ArrayList<>();
-            List<String> headers = new ArrayList<>();
-            boolean[] sawHeader = {false};
-
-            try (Stream<Row> rowStream = sheet.openStream()) {
-                rowStream.forEach(row -> {
-                    if (!sawHeader[0]) {
-                        int count = row.getCellCount();
-                        for (int c = 0; c < count; c++) {
-                            Cell cell = row.hasCell(c) ? row.getCell(c) : null;
-                            headers.add(cellToString(cell).trim());
-                        }
-                        sawHeader[0] = true;
-                        return;
-                    }
-                    Map<String, String> record = new LinkedHashMap<>();
-                    boolean allBlank = true;
-                    for (int c = 0; c < headers.size(); c++) {
-                        Cell cell = row.hasCell(c) ? row.getCell(c) : null;
-                        String value = cellToString(cell).trim();
-                        if (!value.isEmpty()) {
-                            allBlank = false;
-                        }
-                        record.put(headers.get(c), value);
-                    }
-                    if (!allBlank) {
-                        rows.add(record);
-                    }
-                });
-            }
-
-            if (!sawHeader[0]) {
-                throw new IOException("Sheet has no header row: " + xlsxPath);
-            }
-            return rows;
-        }
-    }
 
     private static String cellToString(Cell cell) {
         if (cell == null || cell.getType() == CellType.EMPTY) {
@@ -155,6 +107,50 @@ public final class FastExcelRowReader implements ExcelRowReader {
             return Double.parseDouble(raw);
         } catch (NumberFormatException notNumeric) {
             return null;
+        }
+    }
+
+    @Override
+    public List<Map<String, String>> readFirstSheet(Path xlsxPath) throws IOException {
+        try (InputStream in = new FileInputStream(xlsxPath.toFile());
+             ReadableWorkbook wb = new ReadableWorkbook(in)) {
+            Sheet sheet = wb.getFirstSheet();
+
+            List<Map<String, String>> rows = new ArrayList<>();
+            List<String> headers = new ArrayList<>();
+            boolean[] sawHeader = {false};
+
+            try (Stream<Row> rowStream = sheet.openStream()) {
+                rowStream.forEach(row -> {
+                    if (!sawHeader[0]) {
+                        int count = row.getCellCount();
+                        for (int c = 0; c < count; c++) {
+                            Cell cell = row.hasCell(c) ? row.getCell(c) : null;
+                            headers.add(cellToString(cell).trim());
+                        }
+                        sawHeader[0] = true;
+                        return;
+                    }
+                    Map<String, String> record = new LinkedHashMap<>();
+                    boolean allBlank = true;
+                    for (int c = 0; c < headers.size(); c++) {
+                        Cell cell = row.hasCell(c) ? row.getCell(c) : null;
+                        String value = cellToString(cell).trim();
+                        if (!value.isEmpty()) {
+                            allBlank = false;
+                        }
+                        record.put(headers.get(c), value);
+                    }
+                    if (!allBlank) {
+                        rows.add(record);
+                    }
+                });
+            }
+
+            if (!sawHeader[0]) {
+                throw new IOException("Sheet has no header row: " + xlsxPath);
+            }
+            return rows;
         }
     }
 }

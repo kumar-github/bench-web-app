@@ -2,15 +2,12 @@ package com.example.benchmatch.export;
 
 import com.example.benchmatch.entity.DemandEnriched;
 import com.example.benchmatch.entity.SupplyEnriched;
-import com.example.benchmatch.matching.AssessmentResult;
-import com.example.benchmatch.matching.ClassificationResult;
-import com.example.benchmatch.matching.MatchRow;
-import com.example.benchmatch.matching.MatchingService;
-import com.example.benchmatch.matching.SignalResult;
+import com.example.benchmatch.matching.*;
 import com.example.benchmatch.refresh.RefreshLogic;
 import com.example.benchmatch.repository.DemandEnrichedRepository;
 import com.example.benchmatch.repository.SupplyEnrichedRepository;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -21,36 +18,40 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Java port of write_shortlist_workbook.py + build_matches.py's main() — builds the "Phase 1 Shortlist" workbook
- * (task #19). Runs a fresh matching pass at export time (same candidate scope and per-employee cap as
- * MatchingRunService.runMatching()) rather than reading match_candidates, because match_candidates only persists
- * each signal's quality code and the one-liner (see MatchingRunService/MatchCandidate) — not the full
- * collapsed/expanded text this workbook shows in the "— summary"/"— raw detail" column pairs. Recomputing here keeps
- * this export self-contained and always current, at the cost of duplicating MatchingRunService's small
- * candidate-scope filter (candidateDemandsFor below) — see that method's Javadoc.
+ * Java port of write_shortlist_workbook.py + build_matches.py's main() — builds the "Phase 1 Shortlist" workbook (task
+ * #19). Runs a fresh matching pass at export time (same candidate scope and per-employee cap as
+ * MatchingRunService.runMatching()) rather than reading match_candidates, because match_candidates only persists each
+ * signal's quality code and the one-liner (see MatchingRunService/MatchCandidate) — not the full collapsed/expanded
+ * text this workbook shows in the "— summary"/"— raw detail" column pairs. Recomputing here keeps this export
+ * self-contained and always current, at the cost of duplicating MatchingRunService's small candidate-scope filter
+ * (candidateDemandsFor below) — see that method's Javadoc.
  * <p>
- * Formatting (colors, fonts, column widths, freeze panes, employee/DATA-ISSUE block layout) mirrors the Python
- * source as closely as Apache POI allows. The "Read Me" sheet keeps the Python version's structure (scope, tier
- * definitions, capping rule, classification approach, known limitations) but recomputes every number live from the
- * current database rather than hard-coding the original Phase-1 run's snapshot figures (e.g. "16 employees have
- * zero Strong/Good match") — those were true of one specific historical run, not a general fact worth freezing into
- * every future export.
+ * Formatting (colors, fonts, column widths, freeze panes, employee/DATA-ISSUE block layout) mirrors the Python source
+ * as closely as Apache POI allows. The "Read Me" sheet keeps the Python version's structure (scope, tier definitions,
+ * capping rule, classification approach, known limitations) but recomputes every number live from the current database
+ * rather than hard-coding the original Phase-1 run's snapshot figures (e.g. "16 employees have zero Strong/Good match")
+ * — those were true of one specific historical run, not a general fact worth freezing into every future export.
  */
 @Service
 public class ShortlistWorkbookService {
 
+    /**
+     * Demands per run shown on the main "Demand Shortlist" tab, after sorting by urgency (ageing rank, then open
+     * positions). This is a genuine placeholder, not a verified number — the user had no existing figure for how many
+     * demands TAG/TSC can realistically act on in a week when this was built, and said to pick one and adjust after
+     * seeing real output. 50 was chosen as a plausible middle ground (small enough to not reproduce the "overwhelming"
+     * complaint this export exists to fix, large enough to be worth a weekly run) — treat it as the first number to
+     * revisit once someone who actually works the list has an opinion. Exposed as a parameter on generateByDemand()
+     * (and as a field in the UI/REST layer) specifically so it can be tuned without a code change.
+     */
+    public static final int DEFAULT_MAX_DEMANDS_PER_RUN = 50;
     private static final String FONT_NAME = "Arial";
     private static final Map<String, Integer> TIER_ORDER = Map.of("Strong", 0, "Good", 1, "Weak", 2, "Excluded", 3);
-
     private static final String[][] COLUMNS = {
             {"Overall Signal", "14"}, {"Employee Band", "12"}, {"Employee Location", "14"},
             {"Job Req ID", "11"}, {"Customer", "16"}, {"Project", "20"},
@@ -66,12 +67,10 @@ public class ShortlistWorkbookService {
             {"MAS Mapping cross-check", "40"},
             {"Additional Request (manual review only)", "50"}
     };
-
     // 0-indexed column positions of the two review-flag columns that only get a value (and bold amber styling) when
     // actually flagged — mirrors write_shortlist_workbook.py's `elif c in (22, 23) and v` (its 1-indexed columns).
     private static final int COL_MAS_MAPPING_CHECK = 21;
     private static final int COL_FRONTEND_ANCHOR_CHECK = 22;
-    private static final int COL_MAS_MAPPING_CROSS_CHECK = 23; // added 2026-10-01
 
     // ------------------------------------------------------------------
     // Demand-centric export (added 2026-10-03) — same engine, data and tiers as the employee-centric sheet
@@ -81,18 +80,7 @@ public class ShortlistWorkbookService {
     // "who's available for demand X" without reading past every employee. This does NOT replace generate() —
     // both exports stay available, each for the team whose job matches its grouping.
     // ------------------------------------------------------------------
-
-    /**
-     * Demands per run shown on the main "Demand Shortlist" tab, after sorting by urgency (ageing rank, then open
-     * positions). This is a genuine placeholder, not a verified number — the user had no existing figure for how
-     * many demands TAG/TSC can realistically act on in a week when this was built, and said to pick one and adjust
-     * after seeing real output. 50 was chosen as a plausible middle ground (small enough to not reproduce the
-     * "overwhelming" complaint this export exists to fix, large enough to be worth a weekly run) — treat it as the
-     * first number to revisit once someone who actually works the list has an opinion. Exposed as a parameter on
-     * generateByDemand() (and as a field in the UI/REST layer) specifically so it can be tuned without a code change.
-     */
-    public static final int DEFAULT_MAX_DEMANDS_PER_RUN = 50;
-
+    private static final int COL_MAS_MAPPING_CROSS_CHECK = 23; // added 2026-10-01
     // Mirrors MAX_GOOD_PER_EMPLOYEE's role on the other axis — kept at the same value for consistency with the
     // employee-centric sheet's cap, not because it's been separately validated for this axis. Revisit independently
     // if a demand with many plausible Good candidates turns out to need more than 3 shown.
@@ -119,11 +107,35 @@ public class ShortlistWorkbookService {
     private final MatchingService matchingService;
 
     public ShortlistWorkbookService(SupplyEnrichedRepository supplyRepo, DemandEnrichedRepository demandRepo,
-                                     MatchingService matchingService) {
+                                    MatchingService matchingService) {
         this.supplyRepo = supplyRepo;
         this.demandRepo = demandRepo;
         this.matchingService = matchingService;
     }
+
+    private static void setValue(Cell cell, Object v) {
+        if (v == null) {
+            cell.setBlank();
+        } else if (v instanceof Integer i) {
+            cell.setCellValue(i);
+        } else if (v instanceof Double d) {
+            cell.setCellValue(d);
+        } else {
+            cell.setCellValue(v.toString());
+        }
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static String fmtNum(Integer v) {
+        return v == null ? "" : String.valueOf(v);
+    }
+
+    // ------------------------------------------------------------------
+    // Demand-centric sheets
+    // ------------------------------------------------------------------
 
     @Transactional(readOnly = true)
     public byte[] generate() {
@@ -178,12 +190,12 @@ public class ShortlistWorkbookService {
     }
 
     /**
-     * Demand-centric counterpart to generate() — see the class block comment above "DEFAULT_MAX_DEMANDS_PER_RUN"
-     * for why this exists. Runs the same matching pass (same scope, same signals, same tiers) but groups by
-     * demand instead of employee, keeps only demands with at least one Strong/Good candidate on the main tab
-     * (everything else goes to "No Coverage" — a demand with nobody Strong/Good in scope needs external
-     * sourcing, not a candidate list), and caps the main tab to the {@code maxDemands} most urgent such demands
-     * so one run is an actionable weekly worklist rather than the entire open portfolio at once.
+     * Demand-centric counterpart to generate() — see the class block comment above "DEFAULT_MAX_DEMANDS_PER_RUN" for
+     * why this exists. Runs the same matching pass (same scope, same signals, same tiers) but groups by demand instead
+     * of employee, keeps only demands with at least one Strong/Good candidate on the main tab (everything else goes to
+     * "No Coverage" — a demand with nobody Strong/Good in scope needs external sourcing, not a candidate list), and
+     * caps the main tab to the {@code maxDemands} most urgent such demands so one run is an actionable weekly worklist
+     * rather than the entire open portfolio at once.
      *
      * @param maxDemands how many demands (by urgency) to include on the main tab; see DEFAULT_MAX_DEMANDS_PER_RUN
      */
@@ -250,12 +262,11 @@ public class ShortlistWorkbookService {
 
     /**
      * Demand-side counterpart to capAndSort()/MatchingService.capEmployeeRows() — all Strong candidates kept, top
-     * MAX_GOOD_PER_DEMAND Good candidates kept. No Weak-fallback or near-miss-Excluded rows here: this method is
-     * only ever called for a demand already known to have at least one Strong/Good row (see generateByDemand's
-     * "actionable" filter), so there's no empty-tier case to fall back from the way the employee side has. Ranks
-     * candidates within a tier by assessment strength first (a real, if soft, quality signal), then by bench
-     * ageing (longest-benched first — ties the ranking back to the bench-reduction goal when assessment ties),
-     * then by name for stable output.
+     * MAX_GOOD_PER_DEMAND Good candidates kept. No Weak-fallback or near-miss-Excluded rows here: this method is only
+     * ever called for a demand already known to have at least one Strong/Good row (see generateByDemand's "actionable"
+     * filter), so there's no empty-tier case to fall back from the way the employee side has. Ranks candidates within a
+     * tier by assessment strength first (a real, if soft, quality signal), then by bench ageing (longest-benched first
+     * — ties the ranking back to the bench-reduction goal when assessment ties), then by name for stable output.
      */
     private List<ShortlistRow> capDemandRows(List<ShortlistRow> rows) {
         Comparator<ShortlistRow> byAssessmentThenAgeingThenName = Comparator
@@ -276,12 +287,8 @@ public class ShortlistWorkbookService {
         return kept;
     }
 
-    // ------------------------------------------------------------------
-    // Demand-centric sheets
-    // ------------------------------------------------------------------
-
     private void writeDemandShortlistSheet(XSSFWorkbook wb, Styles s, List<DemandEnriched> shown,
-                                            Map<String, List<ShortlistRow>> byDemand, int overflow, int maxDemands) {
+                                           Map<String, List<ShortlistRow>> byDemand, int overflow, int maxDemands) {
         Sheet ws = wb.createSheet("Demand Shortlist");
         ws.setDisplayGridlines(false);
 
@@ -371,7 +378,7 @@ public class ShortlistWorkbookService {
     }
 
     private void writeNoCoverageSheet(XSSFWorkbook wb, Styles s, List<DemandEnriched> noCoverage,
-                                       Map<String, List<ShortlistRow>> byDemand) {
+                                      Map<String, List<ShortlistRow>> byDemand) {
         Sheet ws = wb.createSheet("No Coverage");
         ws.setDisplayGridlines(false);
 
@@ -430,7 +437,7 @@ public class ShortlistWorkbookService {
     }
 
     private void writeDemandReadMeSheet(XSSFWorkbook wb, Styles s, int totalClassifiedDemand, int actionableCount,
-                                         int shownCount, int overflow, int noCoverageCount, int maxDemands) {
+                                        int shownCount, int overflow, int noCoverageCount, int maxDemands) {
         Sheet rm = wb.createSheet("Read Me");
         rm.setColumnWidth(0, 100 * 256);
         int[] r = {0};
@@ -474,8 +481,8 @@ public class ShortlistWorkbookService {
 
     /**
      * Same broad-persona-family candidate scope as MatchingRunService.candidateDemandsFor() — duplicated rather than
-     * shared to keep this export independently readable and to avoid widening MatchingRunService's method
-     * visibility for a single caller; see this class's own Javadoc for why a fresh pass is computed here at all.
+     * shared to keep this export independently readable and to avoid widening MatchingRunService's method visibility
+     * for a single caller; see this class's own Javadoc for why a fresh pass is computed here at all.
      */
     private List<DemandEnriched> candidateDemandsFor(SupplyEnriched emp, Map<String, List<DemandEnriched>> demandByPersona) {
         String persona = emp.getPersona() == null ? null : emp.getPersona().getName();
@@ -559,6 +566,10 @@ public class ShortlistWorkbookService {
         );
     }
 
+    // ------------------------------------------------------------------
+    // Sheet 1: Phase 1 Shortlist
+    // ------------------------------------------------------------------
+
     private ClassificationResult toClassificationResult(DemandEnriched dem) {
         return new ClassificationResult(
                 dem.getPersona() == null ? null : dem.getPersona().getName(),
@@ -599,11 +610,11 @@ public class ShortlistWorkbookService {
     }
 
     // ------------------------------------------------------------------
-    // Sheet 1: Phase 1 Shortlist
+    // Sheet 2: Read Me
     // ------------------------------------------------------------------
 
     private void writeShortlistSheet(XSSFWorkbook wb, Styles s, List<SupplyEnriched> orderedEmployees,
-                                      Map<Long, List<ShortlistRow>> byEmployee, List<SupplyEnriched> unclassifiedSupply) {
+                                     Map<Long, List<ShortlistRow>> byEmployee, List<SupplyEnriched> unclassifiedSupply) {
         Sheet ws = wb.createSheet("Phase 1 Shortlist");
         ws.setDisplayGridlines(false);
 
@@ -723,13 +734,9 @@ public class ShortlistWorkbookService {
         return row;
     }
 
-    // ------------------------------------------------------------------
-    // Sheet 2: Read Me
-    // ------------------------------------------------------------------
-
     private void writeReadMeSheet(XSSFWorkbook wb, Styles s, List<SupplyEnriched> orderedEmployees,
-                                   Map<Long, List<ShortlistRow>> byEmployee, int totalPhase1Supply,
-                                   int unclassifiedCount, List<DemandEnriched> classifiedDemand) {
+                                  Map<Long, List<ShortlistRow>> byEmployee, int totalPhase1Supply,
+                                  int unclassifiedCount, List<DemandEnriched> classifiedDemand) {
         Sheet rm = wb.createSheet("Read Me");
         rm.setColumnWidth(0, 100 * 256);
         int[] r = {0};
@@ -814,26 +821,6 @@ public class ShortlistWorkbookService {
         cell.setCellValue(text);
         cell.setCellStyle(style);
         r[0]++;
-    }
-
-    private static void setValue(Cell cell, Object v) {
-        if (v == null) {
-            cell.setBlank();
-        } else if (v instanceof Integer i) {
-            cell.setCellValue(i);
-        } else if (v instanceof Double d) {
-            cell.setCellValue(d);
-        } else {
-            cell.setCellValue(v.toString());
-        }
-    }
-
-    private static String nz(String s) {
-        return s == null ? "" : s;
-    }
-
-    private static String fmtNum(Integer v) {
-        return v == null ? "" : String.valueOf(v);
     }
 
     /**

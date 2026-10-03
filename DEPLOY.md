@@ -26,8 +26,8 @@ tiers and cold starts.
 ## Known fix already applied (2026-10-01)
 
 First real deploy attempt failed at the Docker build step: `mvn: not found`
-(exit 127), from the Maven image the Dockerfile originally used
-(`maven:3.9-eclipse-temurin-21`) not having `mvn` on its PATH in that build
+(exit 127), from the Maven image the Dockerfile originally used (`maven:3.9-eclipse-temurin-21`) not having `mvn` on its
+PATH in that build
 — never root-caused further, since this repo's dev sandbox has no Docker
 daemon to test image tags against directly. Fixed by switching the build
 stage to a plain, well-known JDK image (`eclipse-temurin:21-jdk-jammy`)
@@ -59,6 +59,7 @@ state.
 possible to verify against the real `Demand.xlsx` in this sandbox (no
 Docker daemon, no access to the actual file size/complexity). If a large
 enough file still OOMs after this change, the two real fixes are:
+
 1. **More RAM** — move off Render's free 512MB tier to something like an
    Oracle Cloud Always Free VM (already recommended earlier for avoiding
    cold-starts too — it has no comparable RAM ceiling on the free shape).
@@ -72,8 +73,8 @@ enough file still OOMs after this change, the two real fixes are:
    row-reading semantics).
 
 If you hit OOM again, the fastest next step is checking the actual size of
-the `Demand.xlsx`/`AFD-Supply.xlsx` files being uploaded — if they're small
-(a few thousand rows), option 1 or 2 should comfortably fix it; if they're
+the `Demand.xlsx`/`AFD-Supply.xlsx` files being uploaded — if they're small (a few thousand rows), option 1 or 2 should
+comfortably fix it; if they're
 genuinely large (tens of thousands of rows or more), option 2 is probably
 needed regardless of RAM.
 
@@ -141,33 +142,33 @@ weakest.
 3. **Try the Blueprint first:** New → Blueprint → connect the repo → Render
    reads `render.yaml` and proposes a web service + a Postgres database →
    Apply.
-   - **If the database connection doesn't come up clean** (the web service
-     fails to start because `SPRING_DATASOURCE_URL` isn't a valid JDBC
-     URL): Render's "connection string" field doesn't always include the
-     `jdbc:` prefix Spring Boot needs. Fix: open the Postgres instance's
-     "Info" page, copy the **Host**, **Port**, and **Database** values, then
-     on the web service's **Environment** tab set
-     `SPRING_DATASOURCE_URL` by hand to:
-     ```
-     jdbc:postgresql://<host>:<port>/<database>
-     jdbc:postgresql://dpg-dav7ahfpn0mc73agsdr0-a:5432/bench_match_db_osa9
-     postgresql://bench_match_db_osa9_user:lX6phRf8WtPoEwTYWvODXhwAdnkTJuoK@dpg-dav7ahfpn0mc73agsdr0-a/bench_match_db_osa9
-     postgresql://bench_match_db_osa9_user:lX6phRf8WtPoEwTYWvODXhwAdnkTJuoK@dpg-dav7ahfpn0mc73agsdr0-a.oregon-postgres.render.com/bench_match_db_osa9
-     ```
-     and set `SPRING_DATASOURCE_USERNAME`/`SPRING_DATASOURCE_PASSWORD` from
-     the same Info page. Save → the service redeploys automatically.
+    - **If the database connection doesn't come up clean** (the web service
+      fails to start because `SPRING_DATASOURCE_URL` isn't a valid JDBC
+      URL): Render's "connection string" field doesn't always include the
+      `jdbc:` prefix Spring Boot needs. Fix: open the Postgres instance's
+      "Info" page, copy the **Host**, **Port**, and **Database** values, then
+      on the web service's **Environment** tab set
+      `SPRING_DATASOURCE_URL` by hand to:
+      ```
+      jdbc:postgresql://<host>:<port>/<database>
+      jdbc:postgresql://dpg-dav7ahfpn0mc73agsdr0-a:5432/bench_match_db_osa9
+      postgresql://bench_match_db_osa9_user:lX6phRf8WtPoEwTYWvODXhwAdnkTJuoK@dpg-dav7ahfpn0mc73agsdr0-a/bench_match_db_osa9
+      postgresql://bench_match_db_osa9_user:lX6phRf8WtPoEwTYWvODXhwAdnkTJuoK@dpg-dav7ahfpn0mc73agsdr0-a.oregon-postgres.render.com/bench_match_db_osa9
+      ```
+      and set `SPRING_DATASOURCE_USERNAME`/`SPRING_DATASOURCE_PASSWORD` from
+      the same Info page. Save → the service redeploys automatically.
 
 4. **If you'd rather skip the Blueprint and click through manually** (also
    fine, arguably clearer the first time):
-   - New → PostgreSQL → free plan → create. Note its Host/Port/Database/
-     User/Password from the Info page.
-   - New → Web Service → connect the repo → Render should auto-detect the
-     `Dockerfile`; if it offers a build-command/start-command form instead,
-     switch the "Runtime" to Docker.
-   - On the web service's Environment tab, add `SPRING_DATASOURCE_URL`
-     (`jdbc:postgresql://<host>:<port>/<database>`),
-     `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`.
-   - Deploy.
+    - New → PostgreSQL → free plan → create. Note its Host/Port/Database/
+      User/Password from the Info page.
+    - New → Web Service → connect the repo → Render should auto-detect the
+      `Dockerfile`; if it offers a build-command/start-command form instead,
+      switch the "Runtime" to Docker.
+    - On the web service's Environment tab, add `SPRING_DATASOURCE_URL`
+      (`jdbc:postgresql://<host>:<port>/<database>`),
+      `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`.
+    - Deploy.
 
 5. **First build will be slow** (Maven downloading dependencies + Vaadin
    downloading its own Node.js + npm install — easily 5–10 minutes on a

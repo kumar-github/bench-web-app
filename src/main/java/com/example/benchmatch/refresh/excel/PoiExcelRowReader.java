@@ -18,22 +18,40 @@ import java.util.Map;
  * {@code ExcelSheetReader} directly (moved here unchanged, 2026-10-02, when {@link FastExcelRowReader} was added
  * alongside it — see {@link ExcelRowReaders} for how the two are switched between).
  * <p>
- * Reads the first sheet of an .xlsx file the way pandas.read_excel() effectively does for this pipeline's purposes:
- * row 0 is the header, every cell is rendered to a String (numbers without a trailing ".0" unless they're genuinely
- * fractional, so "12345" round-trips the same way Employee Code / Job Requisition ID do in the Python CSVs), and a
- * row is skipped only if every cell in it is blank.
+ * Reads the first sheet of an .xlsx file the way pandas.read_excel() effectively does for this pipeline's purposes: row
+ * 0 is the header, every cell is rendered to a String (numbers without a trailing ".0" unless they're genuinely
+ * fractional, so "12345" round-trips the same way Employee Code / Job Requisition ID do in the Python CSVs), and a row
+ * is skipped only if every cell in it is blank.
  * <p>
  * Deliberately does NOT replicate pandas' NaN semantics exactly — a missing/blank cell always comes back as "" here,
- * and callers (see RefreshLogic.nz()) treat "" and null as equivalent, which is what every filter in
- * classify_inputs.py actually checks for.
+ * and callers (see RefreshLogic.nz()) treat "" and null as equivalent, which is what every filter in classify_inputs.py
+ * actually checks for.
  * <p>
- * Known memory characteristic: {@code XSSFWorkbook} loads the entire workbook as an in-memory XML object tree
- * (via xmlbeans) before a single cell can be read — this is what caused the real OutOfMemoryError on Render's
- * free 512MB tier (see DEPLOY.md, "Known fix #2"). {@link FastExcelRowReader} exists specifically to avoid this.
+ * Known memory characteristic: {@code XSSFWorkbook} loads the entire workbook as an in-memory XML object tree (via
+ * xmlbeans) before a single cell can be read — this is what caused the real OutOfMemoryError on Render's free 512MB
+ * tier (see DEPLOY.md, "Known fix #2"). {@link FastExcelRowReader} exists specifically to avoid this.
  */
 public final class PoiExcelRowReader implements ExcelRowReader {
 
     private static final DecimalFormat WHOLE_NUMBER = new DecimalFormat("#");
+
+    private static String cellToString(Cell cell, DataFormatter formatter) {
+        if (cell == null) {
+            return "";
+        }
+        if (cell.getCellType() == CellType.NUMERIC) {
+            double v = cell.getNumericCellValue();
+            if (v == Math.floor(v) && !Double.isInfinite(v)) {
+                return WHOLE_NUMBER.format(v);
+            }
+            return Double.toString(v);
+        }
+        if (cell.getCellType() == CellType.FORMULA) {
+            // Evaluated formula result rendered the same way as a plain cell.
+            return formatter.formatCellValue(cell);
+        }
+        return formatter.formatCellValue(cell);
+    }
 
     @Override
     public List<Map<String, String>> readFirstSheet(Path xlsxPath) throws IOException {
@@ -73,23 +91,5 @@ public final class PoiExcelRowReader implements ExcelRowReader {
             }
             return rows;
         }
-    }
-
-    private static String cellToString(Cell cell, DataFormatter formatter) {
-        if (cell == null) {
-            return "";
-        }
-        if (cell.getCellType() == CellType.NUMERIC) {
-            double v = cell.getNumericCellValue();
-            if (v == Math.floor(v) && !Double.isInfinite(v)) {
-                return WHOLE_NUMBER.format(v);
-            }
-            return Double.toString(v);
-        }
-        if (cell.getCellType() == CellType.FORMULA) {
-            // Evaluated formula result rendered the same way as a plain cell.
-            return formatter.formatCellValue(cell);
-        }
-        return formatter.formatCellValue(cell);
     }
 }

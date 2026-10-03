@@ -12,18 +12,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 /**
- * Landing page, restyled to match the approved {@code Main.dc.html} mock pixel-for-pixel (colors,
- * radii, spacing, type scale) rather than generic Aura chrome — see {@code styles.css}'s
- * ".bm-dash-*" rules and {@link MainLayout}'s class Javadoc for why.
+ * Landing page, restyled to match the approved {@code Main.dc.html} mock pixel-for-pixel (colors, radii, spacing, type
+ * scale) rather than generic Aura chrome — see {@code styles.css}'s ".bm-dash-*" rules and {@link MainLayout}'s class
+ * Javadoc for why.
  * <p>
- * The KPI values and the "needs attention" queue are real, computed in {@link DashboardMetrics}.
- * One deliberate content gap vs. the mock: the mock's 3rd tile is "Awaiting review" — 128/243
- * reviewed, 4 days left in cycle, an "OVERRIDE" badge — all backed by a reviewer-workflow table
- * (demand_review_state) that doesn't exist in this codebase yet. Rather than fabricate that, the
- * tile keeps the mock's exact visual treatment (amber border, amber value/caption) but shows the
- * one genuinely derivable signal instead: employees with no Strong/Good match in the latest run.
- * The "OVERRIDE" badge is dropped from queue rows for the same reason (no override entity yet);
- * the "⚠ NO STRONG/GOOD" badge stays, since that IS real.
+ * The KPI values and the "needs attention" queue are real, computed in {@link DashboardMetrics}. One deliberate content
+ * gap vs. the mock: the mock's 3rd tile is "Awaiting review" — 128/243 reviewed, 4 days left in cycle, an "OVERRIDE"
+ * badge — all backed by a reviewer-workflow table (demand_review_state) that doesn't exist in this codebase yet. Rather
+ * than fabricate that, the tile keeps the mock's exact visual treatment (amber border, amber value/caption) but shows
+ * the one genuinely derivable signal instead: employees with no Strong/Good match in the latest run. The "OVERRIDE"
+ * badge is dropped from queue rows for the same reason (no override entity yet); the "⚠ NO STRONG/GOOD" badge stays,
+ * since that IS real.
  */
 @Route(value = "dashboard", layout = MainLayout.class)
 @RouteAlias(value = "", layout = MainLayout.class)
@@ -45,6 +44,17 @@ public class DashboardView extends Div {
         add(middleRow);
     }
 
+    private static String initialsOf(String name) {
+        String[] parts = name.trim().split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty() && initials.length() < 2) {
+                initials.append(Character.toUpperCase(part.charAt(0)));
+            }
+        }
+        return initials.isEmpty() ? "?" : initials.toString();
+    }
+
     // A plain Div, not FlexLayout — FlexLayout's constructor hard-codes an INLINE
     // `display: flex` style on its element (confirmed in Vaadin's own source), which always
     // beats a stylesheet rule no matter its specificity. That silently defeated the
@@ -64,8 +74,6 @@ public class DashboardView extends Div {
         row.addClassName("bm-kpi-row");
         return row;
     }
-
-    private enum Kpi { PLAIN, HIGHLIGHTED, MUTED }
 
     private Div kpiTile(String label, int valueNumber, String caption, Kpi kind, String captionAccentClass) {
         Span labelSpan = new Span(label);
@@ -166,17 +174,6 @@ public class DashboardView extends Div {
         return queueRow;
     }
 
-    private static String initialsOf(String name) {
-        String[] parts = name.trim().split("\\s+");
-        StringBuilder initials = new StringBuilder();
-        for (String part : parts) {
-            if (!part.isEmpty() && initials.length() < 2) {
-                initials.append(Character.toUpperCase(part.charAt(0)));
-            }
-        }
-        return initials.isEmpty() ? "?" : initials.toString();
-    }
-
     private Div buildMatchQualityCard(DashboardMetrics.Snapshot snapshot) {
         Span title = new Span("Match quality across active bench");
         title.addClassName("bm-card-title");
@@ -234,4 +231,6 @@ public class DashboardView extends Div {
         item.addClassName("bm-legend-item");
         return item;
     }
+
+    private enum Kpi {PLAIN, HIGHLIGHTED, MUTED}
 }

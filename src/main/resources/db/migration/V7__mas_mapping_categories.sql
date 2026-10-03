@@ -34,19 +34,21 @@
 -- practice (see classification_status, skill_signal, etc. in V1/the original design notes) — cheap
 -- insurance against a typo silently leaving a category permanently (in)active.
 
-CREATE TABLE mas_mapping_categories (
+CREATE TABLE mas_mapping_categories
+(
     category TEXT PRIMARY KEY,
     status   TEXT NOT NULL CHECK (status IN ('active', 'inactive')),
     note     TEXT
 );
 
-INSERT INTO mas_mapping_categories (category, status, note) VALUES
-    ('Full Stack',             'active',   NULL),
-    ('Front End',              'active',   NULL),
-    ('Tpm',                    'inactive', 'Technical Project Management -- not an engineering role; not a skill-confidence question like the categories below'),
-    ('Testing',                'inactive', NULL),
-    ('Polyglot',               'inactive', NULL),
-    ('Devops & Sre',           'inactive', NULL),
-    ('Integration',            'inactive', NULL),
-    ('Mainframe',              'inactive', NULL),
-    ('Architects & Emerging',  'inactive', NULL);
+INSERT INTO mas_mapping_categories (category, status, note)
+VALUES ('Full Stack', 'active', NULL),
+       ('Front End', 'active', NULL),
+       ('Tpm', 'inactive',
+        'Technical Project Management -- not an engineering role; not a skill-confidence question like the categories below'),
+       ('Testing', 'inactive', NULL),
+       ('Polyglot', 'inactive', NULL),
+       ('Devops & Sre', 'inactive', NULL),
+       ('Integration', 'inactive', NULL),
+       ('Mainframe', 'inactive', NULL),
+       ('Architects & Emerging', 'inactive', NULL);

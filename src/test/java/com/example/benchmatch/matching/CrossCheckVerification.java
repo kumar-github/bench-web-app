@@ -4,11 +4,9 @@ package com.example.benchmatch.matching;
  * Direct verification of MatchingService.masMappingCrossCheck()/masMappingCrossCheckNote() — the pairing-level MAS
  * Mapping cross-check added 2026-10-01 (the Java port of build_matches.py's new mas_mapping_cross_check logic,
  * requested so the reviewer-facing check ships identically on both sides — see demand-supply-mapping-requirements.md's
- * 2026-10-01 entry). Mirrors the four cases hand-verified for the Python sibling:
- *   1. agreement (same value, trimmed) -> no flag
- *   2. disagreement -> flag, with a note naming both raw values
- *   3. either side missing (null) -> no flag (nothing to compare)
- *   4. whitespace-only differences -> treated as agreement (both sides .strip()'d first)
+ * 2026-10-01 entry). Mirrors the four cases hand-verified for the Python sibling: 1. agreement (same value, trimmed) ->
+ * no flag 2. disagreement -> flag, with a note naming both raw values 3. either side missing (null) -> no flag (nothing
+ * to compare) 4. whitespace-only differences -> treated as agreement (both sides .strip()'d first)
  * <p>
  * No Spring/JPA/DB needed — MatchingService's only dependency is the harmless @Service stereotype annotation, so this
  * runs as a plain main(), same reproduce-independently discipline as RefreshLogicVerification/FullPersonaVerification.
@@ -58,7 +56,7 @@ public class CrossCheckVerification {
     }
 
     private static void check(MatchingService svc, String emp, String dem, boolean expectFlag,
-            String expectNote, String label) {
+                              String expectNote, String label) {
         boolean flag = svc.masMappingCrossCheck(emp, dem);
         String note = svc.masMappingCrossCheckNote(emp, dem);
         boolean ok = flag == expectFlag && java.util.Objects.equals(note, expectNote);

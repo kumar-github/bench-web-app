@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Read API over demand_enriched. Same in-memory-filtering caveat as SupplyController, and same delegation to a
- * shared query service ({@link DemandQueryService}) so the Vaadin DemandView reuses this filtering in-process.
+ * Read API over demand_enriched. Same in-memory-filtering caveat as SupplyController, and same delegation to a shared
+ * query service ({@link DemandQueryService}) so the Vaadin DemandView reuses this filtering in-process.
  */
 @RestController
 @RequestMapping("/api/demand")

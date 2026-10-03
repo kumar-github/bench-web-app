@@ -5,16 +5,13 @@ import com.example.benchmatch.repository.RefreshRunRepository;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.Html;
-import com.vaadin.flow.component.checkbox.Switch;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
-import com.vaadin.flow.component.page.ColorScheme;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.RouterLayout;
 import com.vaadin.flow.router.RouterLink;
-import com.vaadin.flow.server.VaadinSession;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,32 +20,23 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Shared shell for every view — rebuilt pixel-for-pixel against the finalized design
- * ({@code Main.dc.html} in the approved design canvas): a fixed 232px dark sidebar, a 72px
- * white header, and a light content column. This intentionally does NOT use
- * {@code AppLayout}/{@code SideNav} — their shadow-DOM internals don't expose enough styling
- * hooks to hit this mock's exact colors/spacing, so the shell here is plain {@code Div}s/
- * {@code RouterLink}s styled from {@code styles.css} (".bm-*" classes), the same technique the
- * mock itself uses (plain elements, inline styles).
+ * Shared shell for every view — rebuilt pixel-for-pixel against the finalized design ({@code Main.dc.html} in the
+ * approved design canvas): a fixed 232px dark sidebar, a 72px white header, and a light content column. This
+ * intentionally does NOT use {@code AppLayout}/{@code SideNav} — their shadow-DOM internals don't expose enough styling
+ * hooks to hit this mock's exact colors/spacing, so the shell here is plain {@code Div}s/ {@code RouterLink}s styled
+ * from {@code styles.css} (".bm-*" classes), the same technique the mock itself uses (plain elements, inline styles).
  * <p>
- * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply,
- * Demand, Upload, Shortlist. Review, Coverage Log and Admin have no view yet (no
- * demand_review_state/coverage/admin backend), so they render as the mock's disabled
- * "navitem-static" treatment with a SOON badge. "Shortlist" has no equivalent in the mock (it
- * predates this view) — it reuses a plain custom list icon, not one from the approved design.
+ * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Upload,
+ * Shortlist. Review, Coverage Log and Admin have no view yet (no demand_review_state/coverage/admin backend), so they
+ * render as the mock's disabled "navitem-static" treatment with a SOON badge. "Shortlist" has no equivalent in the mock
+ * (it predates this view) — it reuses a plain custom list icon, not one from the approved design.
  * <p>
- * The mock itself is a fixed light palette with a permanently-dark sidebar and no dark-mode
- * variant of its own. As of 2026-10-02 the dark/light Switch flips {@code Page.setColorScheme}
- * AND the shell chrome (sidebar/header/content background, see styles.css's
- * ":root[theme~='dark']" block) now has a real dark variant, on top of Aura's stock components
- * (Grid, Button, etc. on Supply/Demand/Upload/Shortlist) which already respond on their own.
- * The Dashboard route remains the one deliberate exception — its ".bm-dash" container pins
- * itself to the mock's literal light colors regardless of theme, since nobody has designed a
- * dark version of its KPI tiles/cards yet.
+ * The mock itself is a fixed light palette with a permanently-dark sidebar and no dark-mode variant of its own. A
+ * dark-mode toggle existed briefly (2026-10-02/03) but was removed entirely (2026-10-03) — this shell is light-only,
+ * matching the mock, with no color-scheme switching code left anywhere in the app.
  */
 public class MainLayout extends FlexLayout implements RouterLayout {
 
-    private static final String COLOR_SCHEME_ATTRIBUTE = "benchmatch.colorScheme";
     private static final DateTimeFormatter LAST_REFRESHED_FORMAT =
             DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a", Locale.US);
 
@@ -98,12 +86,6 @@ public class MainLayout extends FlexLayout implements RouterLayout {
 
         add(buildSidebar());
         add(buildContentColumn());
-
-        addAttachListener(event -> {
-            if (isDarkModeActive()) {
-                event.getUI().getPage().setColorScheme(ColorScheme.Value.DARK);
-            }
-        });
     }
 
     @Override
@@ -112,13 +94,6 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         if (content != null) {
             outlet.getElement().appendChild(content.getElement());
             headerTitle.setText(pageTitleOf(content));
-            // Marks the shell itself with which route is showing, so styles.css's dark-mode
-            // block can skip entirely for Dashboard — ".bm-header" is shared by every route
-            // (it lives here, not in DashboardView), so without this marker it would flip dark
-            // while ".bm-dash" below it stays pinned light, splitting the page in two. With the
-            // marker, Dashboard stays fully light (header included) and every other route flips
-            // fully dark (header included) — see ":not(.bm-dashboard-route)" in styles.css.
-            setClassName("bm-dashboard-route", content instanceof DashboardView);
         }
     }
 
@@ -215,15 +190,10 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         search.setWidth("260px");
         search.addClassName("bm-search");
 
-        Switch darkModeSwitch = new Switch();
-        darkModeSwitch.getElement().setProperty("title", "Dark mode (affects everything except Dashboard)");
-        darkModeSwitch.setValue(isDarkModeActive());
-        darkModeSwitch.addValueChangeListener(event -> applyColorScheme(event.getValue()));
-
         Div avatar = new Div(new Span("RK"));
         avatar.addClassName("bm-avatar");
 
-        Div right = new Div(lastRefreshed, search, darkModeSwitch, avatar);
+        Div right = new Div(lastRefreshed, search, avatar);
         right.addClassName("bm-header-right");
 
         Div header = new Div(headerTitle, right);
@@ -238,21 +208,5 @@ public class MainLayout extends FlexLayout implements RouterLayout {
                 .max(Comparator.naturalOrder())
                 .orElse(null);
         return latest == null ? "—" : latest.format(LAST_REFRESHED_FORMAT);
-    }
-
-    private void applyColorScheme(boolean dark) {
-        // ColorScheme itself is an annotation (@ColorScheme, for a fixed app-wide scheme on
-        // AppShellConfigurator) — the actual LIGHT/DARK enum constants live one level deeper, on
-        // its nested ColorScheme.Value, which is also what Page#setColorScheme(...) takes.
-        // Confirmed against Vaadin's own source (ColorScheme.java), not just summarized docs,
-        // after this exact mistake (ColorScheme.DARK, which doesn't exist) shipped uncompiled.
-        ColorScheme.Value scheme = dark ? ColorScheme.Value.DARK : ColorScheme.Value.LIGHT;
-        getUI().ifPresent(ui -> ui.getPage().setColorScheme(scheme));
-        VaadinSession.getCurrent().setAttribute(COLOR_SCHEME_ATTRIBUTE, dark);
-    }
-
-    private boolean isDarkModeActive() {
-        Object stored = VaadinSession.getCurrent().getAttribute(COLOR_SCHEME_ATTRIBUTE);
-        return Boolean.TRUE.equals(stored);
     }
 }

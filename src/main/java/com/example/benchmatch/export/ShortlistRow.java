@@ -1,13 +1,13 @@
 package com.example.benchmatch.export;
 
 /**
- * One employee x demand shortlist row, carrying every field write_shortlist_workbook.py's write_employee_block()
- * needs — display fields plus the full collapsed/expanded text for all four signals (skill/band/location/assessment).
- * This is deliberately NOT MatchRow (matching.MatchRow only carries what capEmployeeRows() needs to sort/cap, by
- * design — see that record's own Javadoc) and NOT MatchCandidate (which persists only each signal's quality code,
- * not its display text — see MatchingRunService). Built fresh at export time from a live matching pass, same
- * candidate scope and cap as a matching run, so this always reflects current supply_enriched/demand_enriched data,
- * not a possibly-stale match_candidates table from an earlier run.
+ * One employee x demand shortlist row, carrying every field write_shortlist_workbook.py's write_employee_block() needs
+ * — display fields plus the full collapsed/expanded text for all four signals (skill/band/location/assessment). This is
+ * deliberately NOT MatchRow (matching.MatchRow only carries what capEmployeeRows() needs to sort/cap, by design — see
+ * that record's own Javadoc) and NOT MatchCandidate (which persists only each signal's quality code, not its display
+ * text — see MatchingRunService). Built fresh at export time from a live matching pass, same candidate scope and cap as
+ * a matching run, so this always reflects current supply_enriched/demand_enriched data, not a possibly-stale
+ * match_candidates table from an earlier run.
  */
 public record ShortlistRow(
         Long employeeId,

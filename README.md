@@ -15,15 +15,13 @@ finished app.** What exists:
 
 - Maven project structure (`pom.xml`), Spring Boot + Vaadin Flow + REST
   API dependencies declared, per the agreed architecture. Confirmed with a
-  real `mvn test-compile` on a real machine with Maven Central access
-  (2026-09-28) — see Verification below.
+  real `mvn test-compile` on a real machine with Maven Central access (2026-09-28) — see Verification below.
 - `V1__init_schema.sql` Flyway migration — a direct copy of the reviewed
   `full_db_design.sql`.
-- JPA entities + repositories for the tables needed for matching
-  (`Persona`, `SubPersona`, `SkillClusterRule`, `SkillToken`,
+- JPA entities + repositories for the tables needed for matching (`Persona`, `SubPersona`, `SkillClusterRule`,
+  `SkillToken`,
   `AccessoryWeight`, `SupplyEnriched`, `DemandEnriched`, `RefreshRun`,
-  `MatchCandidate`). Entities for the reviewer-workflow tables
-  (`users`, `supply_overrides`, `demand_review_state`,
+  `MatchCandidate`). Entities for the reviewer-workflow tables (`users`, `supply_overrides`, `demand_review_state`,
   `demand_candidate_decisions`, `decision_history`) are **not yet
   written** — out of scope for this slice.
 - **The matching engine port** (`com.hcltech.benchmatch.matching`) is now
@@ -70,8 +68,8 @@ silently into "add REST controllers."
 
 ## What is NOT done yet
 
-- `RefreshService` IS now verified against a real Postgres database
-  (2026-09-30 — see `RefreshServiceDbVerificationTest`, run against a
+- `RefreshService` IS now verified against a real Postgres database (2026-09-30 — see
+  `RefreshServiceDbVerificationTest`, run against a
   manually-started Postgres container; superseded the "not yet verified"
   note that used to be here).
 - Vaadin UI views and the multipart upload endpoint now exist — see
@@ -118,6 +116,7 @@ the candidate-scope filter is duplicated in both services (~15 lines,
 each class independently readable; flagged here in case it drifts.
 
 Two ways to trigger it, both calling `ShortlistWorkbookService` directly:
+
 - `com.example.benchmatch.view.ShortlistView` (`/shortlist` route) — a
   "Generate & Download" button (Vaadin `Anchor` + `StreamResource`, so
   nothing is computed until actually clicked).
@@ -173,14 +172,15 @@ supply-side band-ladder exclusion (`Sub Band` outside `E1.1`–`E3.2` ⇒ person
 nulled out, `DATA ISSUE` status, excluded from matching entirely — not
 scored as an ordinary discount) was also already correctly implemented in
 `RefreshLogic.classifySupply()`/`classifyDemand()`. The only real gap was in
-`ShortlistWorkbookService` — and even there, all the underlying data
-(`DemandEnriched.masMappingMismatchFlag`, `.frontendAnchorFlag`,
+`ShortlistWorkbookService` — and even there, all the underlying data (`DemandEnriched.masMappingMismatchFlag`,
+`.frontendAnchorFlag`,
 `.additionalRequestRaw`, `SupplyEnriched.subCapabilityMismatchFlag`) and note
 helpers (`RefreshLogic.masMappingNote()`, `.frontendAnchorNote()`,
 `.subCapabilityNote()`) already existed from earlier work — nothing new
 needed adding to the schema or classification layer, only to the export.
 
 **Fix applied**:
+
 - `ShortlistRow` — added `masMappingNote`, `frontendAnchorNote`,
   `additionalRequest` fields.
 - `ShortlistWorkbookService.buildRows()` — computes the three via
@@ -215,8 +215,8 @@ the-service-layer architecture:**
 
 - `com.example.benchmatch.view.UploadView` (`/upload` route) — a Vaadin
   page with two file-drop widgets (Supply, Demand). Calls
-  `RefreshService.refreshSupply()`/`refreshDemand()` directly, in-process
-  (not over HTTP), staging the uploaded bytes to a temp file first since
+  `RefreshService.refreshSupply()`/`refreshDemand()` directly, in-process (not over HTTP), staging the uploaded bytes to
+  a temp file first since
   `RefreshService`/`ExcelSheetReader` need a real `Path`. Shows the
   resulting row counts (in/new/changed/flagged) and any error message.
 - `RefreshController`'s new `POST /api/refresh/supply/upload` and
@@ -239,8 +239,8 @@ the-service-layer architecture:**
   API call the exact same code instead of two copies drifting apart.
   `SupplyController`/`DemandController` now just delegate to them — no
   behavior change, same filters, same DTOs.
-- `com.example.benchmatch.view.MainLayout` — the shared `AppLayout` shell
-  (title bar + a `Tabs`/`RouterLink` strip: Supply, Demand, Upload).
+- `com.example.benchmatch.view.MainLayout` — the shared `AppLayout` shell (title bar + a `Tabs`/`RouterLink` strip:
+  Supply, Demand, Upload).
 
 **Known gaps in this slice, deliberately not addressed:**
 
@@ -340,8 +340,7 @@ Sub Band is what a band-ladder change actually needs to be detected by.
 
 Same pass added `bench_ageing_days` (raw 'Bench Ageing days' column, a
 plain day count) — picked over the source file's bucketed 'Duration'
-column ('0-2 Weeks', etc.) since the day count is strictly more useful
-(a bucket is derivable from it, not the reverse).
+column ('0-2 Weeks', etc.) since the day count is strictly more useful (a bucket is derivable from it, not the reverse).
 
 `demand_enriched` needed no equivalent fix: its existing `band` column
 already stores the fine-grained value (raw 'Demand Sub Band Name') — the
@@ -375,8 +374,8 @@ behavior, in four steps:
    Weak only as a fallback when an employee has zero Strong and zero Good,
    capped at 10, same sort; top-3 Excluded near-misses by
    `(miss_distance, ageing_rank)`).
-3. **`MatchingRunService`**: iterate active supply × candidate demand
-   (same-persona-family pre-filter, matching `build_candidate_demands()`),
+3. **`MatchingRunService`**: iterate active supply × candidate demand (same-persona-family pre-filter, matching
+   `build_candidate_demands()`),
    compute all four signals via the already-verified `MatchingService`,
    apply the cap, write `match_candidates`, record a `refresh_runs` row
    with `source='matching'`.
@@ -460,17 +459,16 @@ Added to `MatchingService.java` (same class as the already-verified
   left out, since the capping algorithm doesn't touch them).
 
 **Verified in the sandbox** with a hand-written smoke test tracing
-several `assessment_signal()` calls against a manual Python trace
-(`Expert`/`Entry`/`0`/`0% Score`/missing-rating cases) and
+several `assessment_signal()` calls against a manual Python trace (`Expert`/`Entry`/`0`/`0% Score`/missing-rating cases)
+and
 `cap_employee_rows()` against constructed row sets (Good-only capping
 order, Strong-present suppresses Weak entirely, Weak-only fallback caps
-at 10, Excluded near-miss ordering) — all matched expected output.
-**Not yet run against real match_rows.csv** — that's step 4, once step 3
-(MatchingRunService) exists to actually produce real rows to check.
+at 10, Excluded near-miss ordering) — all matched expected output. **Not yet run against real match_rows.csv** — that's
+step 4, once step 3 (MatchingRunService) exists to actually produce real rows to check.
 
 **Not wired to anything yet** — `assessmentSignal()`/`ageingRank()`/
-`capEmployeeRows()` are pure functions with no caller. Step 3
-(`MatchingRunService`) is what will actually call them against real
+`capEmployeeRows()` are pure functions with no caller. Step 3 (`MatchingRunService`) is what will actually call them
+against real
 supply/demand rows and write `match_candidates`.
 
 ### Step 3 (2026-09-29): `MatchingRunService` — the first real `match_candidates` producer
@@ -519,8 +517,8 @@ anything this class actually stores.
 `refresh_runs` row mean something different than on a supply/demand
 refresh, since this isn't an upsert against changed source rows —
 documented inline in `finishRun()`: `rowsIn` = classified active supply
-employees considered, `rowsNew` = total `match_candidates` rows written
-(all of them, since the table is fully rewritten), `rowsChanged` =
+employees considered, `rowsNew` = total `match_candidates` rows written (all of them, since the table is fully
+rewritten), `rowsChanged` =
 deliberately `null` (not meaningful here), `rowsFlagged` = count of
 Excluded near-miss rows written (an at-a-glance signal, not a warning).
 
@@ -552,13 +550,13 @@ proven the four signals exact across all 86,837 pre-cap candidate pairs;
 what it couldn't check is everything layered on top in `MatchingRunService`
 specifically — `assessmentSignal()`, `ageingRank()`, `capEmployeeRows()`
 at real scale (previously only hand-traced on 4 made-up scenarios), and
-the `one_liner` text assembly. This harness checks all of it, on the
-**final, post-cap row set** — the actual thing that gets written to
+the `one_liner` text assembly. This harness checks all of it, on the **final, post-cap row set** — the actual thing that
+gets written to
 `match_candidates`.
 
 **Result: exact match, confirmed twice** — once in the sandbox against a
-stale 2026-09-28 snapshot (2,591/2,591), and **again on a real machine
-(2026-09-29) against a fresh snapshot regenerated straight from the
+stale 2026-09-28 snapshot (2,591/2,591), and **again on a real machine (2026-09-29) against a fresh snapshot regenerated
+straight from the
 user's own current `input/AFD-Supply.xlsx`/`Demand.xlsx`: 2,586/2,586,
 0 extra rows, 0 field mismatches** (tier, skill/band/location quality,
 `assessment_rank`, `ageing_rank`, and the full `one_liner` string all
@@ -622,8 +620,7 @@ Reported directly from the shortlist output: a demand naming
 Java/SQL employee, and independently flagged by MAS Mapping Check as
 disagreeing. Root cause: `classify_demand_row()`'s Java/.NET anchor
 branch (`DemandClassifier` here) fires unconditionally whenever
-"Java"/".NET" is present, even when a frontend framework
-(React/Angular/MEAN) is also named and no backend framework
+"Java"/".NET" is present, even when a frontend framework (React/Angular/MEAN) is also named and no backend framework
 (Spring/ASP.NET) confirms it — unlike the mobile-anchor branch just above
 it, which correctly demotes Java/.NET when iOS/Android is present. Affects
 312/899 demand rows, 32 distinct skill-cluster patterns.
@@ -631,8 +628,8 @@ it, which correctly demotes Java/.NET when iOS/Android is present. Affects
 **First fix attempt (rejected):** gating persona routing itself on
 framework confirmation reclassified ~180 legitimately Fullstack Java/.NET
 demands to Frontend — including one whose Additional Request text
-literally said "no GUI experience needed," and one skill-cluster text
-("Devops,Java Full Stack,React.js") tagged Front End on one real job
+literally said "no GUI experience needed," and one skill-cluster text ("Devops,Java Full Stack,React.js") tagged Front
+End on one real job
 requisition and Full Stack on another by different humans. Proof the
 ambiguity lives in the source data, not resolvable by any token rule
 either way.
@@ -662,15 +659,15 @@ now asserts Java's `frontendAnchorFlag` matches Python's
 port is ever missed on a future change, this harness fails loudly instead
 of relying on anyone remembering. This was deliberate: an earlier version
 of this fix appended a review note to `status`/`classification_note`
-instead, which turned out to be invisible in the actual Excel deliverable
-(`write_shortlist_workbook.py` never reads that field) — a dedicated
+instead, which turned out to be invisible in the actual Excel deliverable (`write_shortlist_workbook.py` never reads
+that field) — a dedicated
 flag/column pair with a verification assertion was chosen specifically so
 this can't happen silently again.
 
 **Also fixed along the way (unrelated pre-existing gap, surfaced by
 actually running this harness to completion for the first time)**:
-`RefreshLogicVerification.verifySupply()`/`verifyDemand()` were comparing
-_every_ classified row — including unclassified/data-issue ones — against
+`RefreshLogicVerification.verifySupply()`/`verifyDemand()` were comparing _every_ classified row — including
+unclassified/data-issue ones — against
 `full_supply_classified.csv`/`full_demand_classified.csv`, which
 `export_full_ground_truth.py` deliberately filters to `persona.notna()`
 rows only. Fixed by skipping unclassified rows in the Java-side
@@ -770,8 +767,8 @@ this session briefly consulted a stale duplicate copy at `/home/claude/`
 during this work and it produced an incorrect finding (see
 `MatchingService`'s class Javadoc and the requirements doc's 2026-09-28
 update for the correction). `FullPersonaVerification.java` re-classifies
-every row and re-computes every pairing, broken out by
-(employee-persona x demand-persona) so a regression in one pairing type
+every row and re-computes every pairing, broken out by (employee-persona x demand-persona) so a regression in one
+pairing type
 can't hide in an aggregate pass/fail:
 
 ```
@@ -795,13 +792,12 @@ Fullstack-Java-only script and class, and `full_*.csv` for `fj_*.csv`.
 1. ~~Confirm `mvn compile`/`mvn test` succeed in a real environment.~~ Done (2026-09-28).
 2. ~~Port `skill_signal`'s Frontend-Frontend branch, verify against Frontend and .NET.~~ Done (2026-09-28) — see above.
 3. ~~Write a `RefreshService` that ingests the real Excel files via Apache
-   POI, applying the hash-diff/upsert/soft-delete logic.~~ Implemented
-   (2026-09-28) — see the RefreshService section above. **Still needs a
+   POI, applying the hash-diff/upsert/soft-delete logic.~~ Implemented (2026-09-28) — see the RefreshService section
+   above. **Still needs a
    real run**, both of `RefreshLogicVerification` (against real POI) and
    of `RefreshService` itself against a real database (Postgres, or H2 via
    a `@SpringBootTest` — this project already depends on H2 in test
-   scope). The remaining reviewer-workflow JPA entities
-   (`users`/`supply_overrides`/`demand_review_state`/
+   scope). The remaining reviewer-workflow JPA entities (`users`/`supply_overrides`/`demand_review_state`/
    `demand_candidate_decisions`/`decision_history`) are still not written
    — still out of scope for this slice, and the reason `needs_reattention`
    isn't wired up yet (see gap #1 above).
@@ -898,6 +894,7 @@ Flipping `Tpm` active without building those would just reopen the exact bug thi
 prevent.
 
 **What changed:**
+
 - `Engine.PHASE1_MAS_MAPPING` — was `public static final List.of("Full Stack", "Front End")`; is
   now a settable field (`Engine.setPhase1MasMapping(List<String>)` / `getPhase1MasMapping()`), with
   the same two values kept as the fallback default so `RefreshLogicVerification`'s standalone
@@ -923,8 +920,8 @@ prevent.
   same thing two different ways. Mirrors the identical simplification made in `classify_inputs.py`.
 
 **Verified:** standalone `javac` compile of `Engine.java` + `RefreshLogic.java` (still
-Spring/JPA-free, same as the AFD Status fix) is clean, plus a direct sanity test
-(`TestScope.java`) confirming: the Tpm row on the real flagged phrase gets `persona = null` +
+Spring/JPA-free, same as the AFD Status fix) is clean, plus a direct sanity test (`TestScope.java`) confirming: the Tpm
+row on the real flagged phrase gets `persona = null` +
 `OUT OF PHASE 1 SCOPE` status; a Full Stack row with the same phrase still classifies
 `Fullstack Java`; calling `setPhase1MasMapping(["Full Stack","Front End","Tpm"])` and re-running
 correctly lets the Tpm row flow into skill-text classification again (demonstrating the

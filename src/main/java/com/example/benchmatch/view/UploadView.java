@@ -21,14 +21,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Runs a supply or demand refresh from an uploaded Excel file. Calls {@link RefreshService} directly, in-process —
- * NOT the REST multipart endpoints in RefreshController (see that class's Javadoc for why: this is a Vaadin view,
- * so per this app's own architecture it goes straight to the service layer rather than round-tripping through
- * HTTP to itself).
+ * Runs a supply or demand refresh from an uploaded Excel file. Calls {@link RefreshService} directly, in-process — NOT
+ * the REST multipart endpoints in RefreshController (see that class's Javadoc for why: this is a Vaadin view, so per
+ * this app's own architecture it goes straight to the service layer rather than round-tripping through HTTP to
+ * itself).
  * <p>
- * Each Upload widget accepts one .xlsx file, buffers it in memory (small files — the real AFD-Supply/Demand
- * exports are a few hundred rows), stages it to a temp file (RefreshService/ExcelSheetReader need a real Path, not
- * a stream), runs the matching refresh, shows the resulting row counts, and cleans the temp file up.
+ * Each Upload widget accepts one .xlsx file, buffers it in memory (small files — the real AFD-Supply/Demand exports are
+ * a few hundred rows), stages it to a temp file (RefreshService/ExcelSheetReader need a real Path, not a stream), runs
+ * the matching refresh, shows the resulting row counts, and cleans the temp file up.
  */
 @Route(value = "upload", layout = MainLayout.class)
 @PageTitle("Upload")

@@ -30,59 +30,11 @@ public final class Engine {
             "Assignation Pending",
             "HR Action - WIP"
     );
-    // Case/whitespace-normalized form of PROPOSABLE_STATUSES, used by isProposableStatus() below.
-    // Ported 2026-09-30 to mirror classify_inputs.py's fix for the same day: a real refreshed export
-    // started writing "Blocked/Proposed for opportunity" (lowercase 'o') instead of "...Opportunity",
-    // and a plain PROPOSABLE_STATUSES.contains(...) exact match silently dropped every row carrying
-    // that status — 119 of 268 otherwise-eligible employees (44%), with no error, no warning, no entry
-    // in any unclassified/data-issue queue. See demand-supply-mapping-requirements.md, "AFD Status
-    // case-sensitivity bug" (2026-09-30), for the full writeup and Python fix this mirrors.
-    private static final Set<String> PROPOSABLE_STATUSES_NORMALIZED = PROPOSABLE_STATUSES.stream()
-            .map(s -> s.strip().toLowerCase())
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
-
     /**
-     * True if {@code afdStatus} matches one of PROPOSABLE_STATUSES, ignoring case and leading/trailing
-     * whitespace. Use this instead of {@code PROPOSABLE_STATUSES.contains(...)} — the raw list is kept
-     * public for display/reference, but an exact-match filter against a source team's free-text status
-     * field is exactly what broke silently on 2026-09-30 (see comment above). Null-safe: returns false
-     * for null.
-     */
-    public static boolean isProposableStatus(String afdStatus) {
-        if (afdStatus == null) {
-            return false;
-        }
-        return PROPOSABLE_STATUSES_NORMALIZED.contains(afdStatus.strip().toLowerCase());
-    }
-
-    // Fallback only, used before RefreshService ever sets the real value (e.g. in
-    // RefreshLogicVerification's standalone harness, which has no DB) — mirrors
-    // classify_inputs.py's _PHASE1_MAS_MAPPING_FALLBACK exactly. The real, editable source of truth
-    // is the mas_mapping_categories DB table (V7__mas_mapping_categories.sql); RefreshService calls
-    // setPhase1MasMapping() with that table's active categories before every refresh run. Changed
-    // 2026-10-01 from a hardcoded `public static final List.of(...)` to a settable field so the
-    // active set can be changed via data (that table), not a code change — see that migration's
-    // header comment, and mas_mapping_categories.json on the Python CLI side (kept in sync by hand;
-    // no DB there), before changing what's active.
-    private static volatile List<String> PHASE1_MAS_MAPPING_CURRENT = List.of("Full Stack", "Front End");
-
-    public static List<String> getPhase1MasMapping() {
-        return PHASE1_MAS_MAPPING_CURRENT;
-    }
-
-    public static void setPhase1MasMapping(List<String> activeCategories) {
-        if (activeCategories == null || activeCategories.isEmpty()) {
-            throw new IllegalArgumentException("Phase 1 MAS Mapping active set cannot be null/empty — "
-                    + "refusing to silently exclude every demand/supply row.");
-        }
-        PHASE1_MAS_MAPPING_CURRENT = List.copyOf(activeCategories);
-    }
-
-    /**
-     * Static-field compatibility shim so existing {@code Engine.PHASE1_MAS_MAPPING.contains(...)}
-     * call sites (RefreshLogic, RefreshLogicVerification) keep working unchanged after the field
-     * above became settable — this can't itself be reassigned, but {@code .contains(...)} always
-     * reads through to the current live value via this delegating wrapper.
+     * Static-field compatibility shim so existing {@code Engine.PHASE1_MAS_MAPPING.contains(...)} call sites
+     * (RefreshLogic, RefreshLogicVerification) keep working unchanged after the field above became settable — this
+     * can't itself be reassigned, but {@code .contains(...)} always reads through to the current live value via this
+     * delegating wrapper.
      */
     public static final List<String> PHASE1_MAS_MAPPING = new java.util.AbstractList<>() {
         @Override
@@ -155,10 +107,55 @@ public final class Engine {
             "iOS", Set.of("iOS"),
             "Android", Set.of("Android")
     );
+    // Case/whitespace-normalized form of PROPOSABLE_STATUSES, used by isProposableStatus() below.
+    // Ported 2026-09-30 to mirror classify_inputs.py's fix for the same day: a real refreshed export
+    // started writing "Blocked/Proposed for opportunity" (lowercase 'o') instead of "...Opportunity",
+    // and a plain PROPOSABLE_STATUSES.contains(...) exact match silently dropped every row carrying
+    // that status — 119 of 268 otherwise-eligible employees (44%), with no error, no warning, no entry
+    // in any unclassified/data-issue queue. See demand-supply-mapping-requirements.md, "AFD Status
+    // case-sensitivity bug" (2026-09-30), for the full writeup and Python fix this mirrors.
+    private static final Set<String> PROPOSABLE_STATUSES_NORMALIZED = PROPOSABLE_STATUSES.stream()
+            .map(s -> s.strip().toLowerCase())
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
     private static final Map<String, Integer> BAND_INDEX = buildBandIndex();
     private static final Map<String, String> CITY_ALIASES = Map.of("HFHYD", "Hyderabad");
+    // Fallback only, used before RefreshService ever sets the real value (e.g. in
+    // RefreshLogicVerification's standalone harness, which has no DB) — mirrors
+    // classify_inputs.py's _PHASE1_MAS_MAPPING_FALLBACK exactly. The real, editable source of truth
+    // is the mas_mapping_categories DB table (V7__mas_mapping_categories.sql); RefreshService calls
+    // setPhase1MasMapping() with that table's active categories before every refresh run. Changed
+    // 2026-10-01 from a hardcoded `public static final List.of(...)` to a settable field so the
+    // active set can be changed via data (that table), not a code change — see that migration's
+    // header comment, and mas_mapping_categories.json on the Python CLI side (kept in sync by hand;
+    // no DB there), before changing what's active.
+    private static volatile List<String> PHASE1_MAS_MAPPING_CURRENT = List.of("Full Stack", "Front End");
 
     private Engine() {
+    }
+
+    /**
+     * True if {@code afdStatus} matches one of PROPOSABLE_STATUSES, ignoring case and leading/trailing whitespace. Use
+     * this instead of {@code PROPOSABLE_STATUSES.contains(...)} — the raw list is kept public for display/reference,
+     * but an exact-match filter against a source team's free-text status field is exactly what broke silently on
+     * 2026-09-30 (see comment above). Null-safe: returns false for null.
+     */
+    public static boolean isProposableStatus(String afdStatus) {
+        if (afdStatus == null) {
+            return false;
+        }
+        return PROPOSABLE_STATUSES_NORMALIZED.contains(afdStatus.strip().toLowerCase());
+    }
+
+    public static List<String> getPhase1MasMapping() {
+        return PHASE1_MAS_MAPPING_CURRENT;
+    }
+
+    public static void setPhase1MasMapping(List<String> activeCategories) {
+        if (activeCategories == null || activeCategories.isEmpty()) {
+            throw new IllegalArgumentException("Phase 1 MAS Mapping active set cannot be null/empty — "
+                    + "refusing to silently exclude every demand/supply row.");
+        }
+        PHASE1_MAS_MAPPING_CURRENT = List.copyOf(activeCategories);
     }
 
     private static Map<String, Integer> buildBandIndex() {

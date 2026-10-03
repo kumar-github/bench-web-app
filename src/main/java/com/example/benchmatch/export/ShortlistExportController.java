@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 /**
- * Download endpoints for the shortlist workbooks (task #19, plus the by-demand export added 2026-10-03) — the
- * REST-side counterpart to the Vaadin "Generate" buttons in ShortlistView, for any consumer outside the browser.
- * All call ShortlistWorkbookService directly; this controller only adds the HTTP download headers.
+ * Download endpoints for the shortlist workbooks (task #19, plus the by-demand export added 2026-10-03) — the REST-side
+ * counterpart to the Vaadin "Generate" buttons in ShortlistView, for any consumer outside the browser. All call
+ * ShortlistWorkbookService directly; this controller only adds the HTTP download headers.
  */
 @RestController
 public class ShortlistExportController {
