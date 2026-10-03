@@ -20,6 +20,11 @@ public record ShortlistRow(
         String employeePrimeNv,
         String employeeAfdStatus,
         Integer employeeBenchAgeing,
+        // Added 2026-10-03 for the demand-centric export's per-demand candidate ranking (capDemandRows in
+        // ShortlistWorkbookService) — MatchingService.assessmentSignal()'s AssessmentResult.rank(), higher is better
+        // (Expert=6 ... Entry=1, 0 = not yet assessed). Not itself a sheet column; the employee-centric sheet never
+        // needed this as a standalone field because its cap (capEmployeeRows) sorts by demand urgency, not assessment.
+        int employeeAssessmentRank,
 
         String demandId,            // "Job Req ID" column — demand_id IS the Job Requisition ID (see V1 schema)
         String customer,

@@ -73,6 +73,47 @@ public class ShortlistWorkbookService {
     private static final int COL_FRONTEND_ANCHOR_CHECK = 22;
     private static final int COL_MAS_MAPPING_CROSS_CHECK = 23; // added 2026-10-01
 
+    // ------------------------------------------------------------------
+    // Demand-centric export (added 2026-10-03) — same engine, data and tiers as the employee-centric sheet
+    // above, reorganized around the fulfillment team's actual unit of work (one demand, many candidates)
+    // instead of the proposal team's (one employee, many demands). See the class-level discussion that led
+    // here: TAG/TSC (who fulfill demands) were getting the employee-grouped sheet and had no way to jump to
+    // "who's available for demand X" without reading past every employee. This does NOT replace generate() —
+    // both exports stay available, each for the team whose job matches its grouping.
+    // ------------------------------------------------------------------
+
+    /**
+     * Demands per run shown on the main "Demand Shortlist" tab, after sorting by urgency (ageing rank, then open
+     * positions). This is a genuine placeholder, not a verified number — the user had no existing figure for how
+     * many demands TAG/TSC can realistically act on in a week when this was built, and said to pick one and adjust
+     * after seeing real output. 50 was chosen as a plausible middle ground (small enough to not reproduce the
+     * "overwhelming" complaint this export exists to fix, large enough to be worth a weekly run) — treat it as the
+     * first number to revisit once someone who actually works the list has an opinion. Exposed as a parameter on
+     * generateByDemand() (and as a field in the UI/REST layer) specifically so it can be tuned without a code change.
+     */
+    public static final int DEFAULT_MAX_DEMANDS_PER_RUN = 50;
+
+    // Mirrors MAX_GOOD_PER_EMPLOYEE's role on the other axis — kept at the same value for consistency with the
+    // employee-centric sheet's cap, not because it's been separately validated for this axis. Revisit independently
+    // if a demand with many plausible Good candidates turns out to need more than 3 shown.
+    private static final int MAX_GOOD_PER_DEMAND = 3;
+
+    private static final String[][] DEMAND_CANDIDATE_COLUMNS = {
+            {"Overall Signal", "14"}, {"Employee Name", "26"}, {"Employee Band", "12"}, {"Employee Location", "14"},
+            {"Bench Ageing (days)", "14"},
+            {"Skill — summary", "46"}, {"Band — summary", "20"}, {"Location — summary", "16"},
+            {"Assessment — summary", "24"}, {"Skill — raw detail", "46"}, {"Band — raw detail", "30"},
+            {"Location — raw detail", "40"}, {"Assessment — raw detail", "28"}, {"Reasoning (one-line)", "60"},
+            {"MAS Mapping cross-check", "40"}, {"Additional Request (manual review only)", "50"}
+    };
+    private static final int DCOL_MAS_MAPPING_CROSS_CHECK = 14;
+
+    private static final String[][] NO_COVERAGE_COLUMNS = {
+            {"Job Req ID", "11"}, {"Customer", "16"}, {"Project", "20"}, {"Demand Persona / Sub-persona", "24"},
+            {"Demand Band", "10"}, {"Demand Location", "14"}, {"Balance Positions", "10"}, {"Due Category", "16"},
+            {"Ageing Bucket", "12"}, {"Why no candidate", "50"}
+    };
+
     private final SupplyEnrichedRepository supplyRepo;
     private final DemandEnrichedRepository demandRepo;
     private final MatchingService matchingService;
@@ -137,6 +178,301 @@ public class ShortlistWorkbookService {
     }
 
     /**
+     * Demand-centric counterpart to generate() — see the class block comment above "DEFAULT_MAX_DEMANDS_PER_RUN"
+     * for why this exists. Runs the same matching pass (same scope, same signals, same tiers) but groups by
+     * demand instead of employee, keeps only demands with at least one Strong/Good candidate on the main tab
+     * (everything else goes to "No Coverage" — a demand with nobody Strong/Good in scope needs external
+     * sourcing, not a candidate list), and caps the main tab to the {@code maxDemands} most urgent such demands
+     * so one run is an actionable weekly worklist rather than the entire open portfolio at once.
+     *
+     * @param maxDemands how many demands (by urgency) to include on the main tab; see DEFAULT_MAX_DEMANDS_PER_RUN
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateByDemand(int maxDemands) {
+        List<SupplyEnriched> classifiedSupply = supplyRepo.findByIsActiveTrue().stream()
+                .filter(s -> s.getPersona() != null)
+                .toList();
+
+        List<DemandEnriched> classifiedDemand = demandRepo.findByIsActiveTrue().stream()
+                .filter(d -> d.getPersona() != null)
+                .toList();
+        Map<String, List<DemandEnriched>> demandByPersona = classifiedDemand.stream()
+                .collect(Collectors.groupingBy(d -> d.getPersona().getName()));
+
+        // Every employee x demand row the engine can justify, uncapped — capping happens below, per demand,
+        // not per employee (that's the whole point of this export). Same buildRows() as generate() uses, so
+        // the signals/tiers/one-liners are identical; only the grouping and capping axis differ.
+        List<ShortlistRow> allRows = new ArrayList<>();
+        for (SupplyEnriched emp : classifiedSupply) {
+            List<DemandEnriched> candidates = candidateDemandsFor(emp, demandByPersona);
+            if (!candidates.isEmpty()) {
+                allRows.addAll(buildRows(emp, candidates));
+            }
+        }
+        Map<String, List<ShortlistRow>> byDemand = allRows.stream()
+                .collect(Collectors.groupingBy(ShortlistRow::demandId));
+
+        Comparator<DemandEnriched> byUrgencyThenOpenPositions = Comparator
+                .<DemandEnriched>comparingInt(d -> matchingService.ageingRank(d.getDueCategory()))
+                .thenComparingInt(d -> -(d.getBalancePositions() == null ? 0 : d.getBalancePositions()));
+
+        List<DemandEnriched> actionable = new ArrayList<>();
+        List<DemandEnriched> noCoverage = new ArrayList<>();
+        for (DemandEnriched dem : classifiedDemand) {
+            List<ShortlistRow> rows = byDemand.getOrDefault(dem.getDemandId(), List.of());
+            boolean hasStrongOrGood = rows.stream().anyMatch(r -> "Strong".equals(r.overallTier()) || "Good".equals(r.overallTier()));
+            if (hasStrongOrGood) {
+                actionable.add(dem);
+            } else {
+                noCoverage.add(dem);
+            }
+        }
+        actionable.sort(byUrgencyThenOpenPositions);
+        noCoverage.sort(byUrgencyThenOpenPositions);
+
+        List<DemandEnriched> shown = actionable.stream().limit(Math.max(0, maxDemands)).toList();
+        int overflow = actionable.size() - shown.size();
+
+        try (XSSFWorkbook wb = new XSSFWorkbook()) {
+            Styles styles = new Styles(wb);
+            writeDemandShortlistSheet(wb, styles, shown, byDemand, overflow, maxDemands);
+            writeNoCoverageSheet(wb, styles, noCoverage, byDemand);
+            writeDemandReadMeSheet(wb, styles, classifiedDemand.size(), actionable.size(), shown.size(), overflow,
+                    noCoverage.size(), maxDemands);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to build demand-centric shortlist workbook", e);
+        }
+    }
+
+    /**
+     * Demand-side counterpart to capAndSort()/MatchingService.capEmployeeRows() — all Strong candidates kept, top
+     * MAX_GOOD_PER_DEMAND Good candidates kept. No Weak-fallback or near-miss-Excluded rows here: this method is
+     * only ever called for a demand already known to have at least one Strong/Good row (see generateByDemand's
+     * "actionable" filter), so there's no empty-tier case to fall back from the way the employee side has. Ranks
+     * candidates within a tier by assessment strength first (a real, if soft, quality signal), then by bench
+     * ageing (longest-benched first — ties the ranking back to the bench-reduction goal when assessment ties),
+     * then by name for stable output.
+     */
+    private List<ShortlistRow> capDemandRows(List<ShortlistRow> rows) {
+        Comparator<ShortlistRow> byAssessmentThenAgeingThenName = Comparator
+                .<ShortlistRow>comparingInt(ShortlistRow::employeeAssessmentRank).reversed()
+                .thenComparing(Comparator.<ShortlistRow>comparingInt(
+                        r -> r.employeeBenchAgeing() == null ? 0 : r.employeeBenchAgeing()).reversed())
+                .thenComparing(ShortlistRow::employeeName, Comparator.nullsLast(String::compareTo));
+
+        List<ShortlistRow> strong = rows.stream().filter(r -> "Strong".equals(r.overallTier()))
+                .sorted(byAssessmentThenAgeingThenName).toList();
+        List<ShortlistRow> good = rows.stream().filter(r -> "Good".equals(r.overallTier()))
+                .sorted(byAssessmentThenAgeingThenName)
+                .limit(MAX_GOOD_PER_DEMAND)
+                .toList();
+
+        List<ShortlistRow> kept = new ArrayList<>(strong);
+        kept.addAll(good);
+        return kept;
+    }
+
+    // ------------------------------------------------------------------
+    // Demand-centric sheets
+    // ------------------------------------------------------------------
+
+    private void writeDemandShortlistSheet(XSSFWorkbook wb, Styles s, List<DemandEnriched> shown,
+                                            Map<String, List<ShortlistRow>> byDemand, int overflow, int maxDemands) {
+        Sheet ws = wb.createSheet("Demand Shortlist");
+        ws.setDisplayGridlines(false);
+
+        Row r1 = ws.createRow(0);
+        Cell title = r1.createCell(0);
+        title.setCellValue("Demand & Supply Mapping — Matching Engine Output (by Demand)");
+        title.setCellStyle(s.title);
+        ws.addMergedRegion(new CellRangeAddress(0, 0, 0, 4));
+
+        Row r2 = ws.createRow(1);
+        Cell subtitle = r2.createCell(0);
+        subtitle.setCellValue("Grouped by demand, most urgent first; only demands with a Strong/Good candidate are "
+                + "shown here (see the 'No Coverage' tab for the rest), capped to the top " + maxDemands
+                + " most urgent this run" + (overflow > 0 ? " — " + overflow + " more actionable demand(s) waiting "
+                + "for next run" : "") + ". See 'Read Me' for methodology and the per-demand candidate cap.");
+        subtitle.setCellStyle(s.subtitle);
+        ws.addMergedRegion(new CellRangeAddress(1, 1, 0, DEMAND_CANDIDATE_COLUMNS.length - 1));
+
+        int headerRowIdx = 3;
+        Row headerRow = ws.createRow(headerRowIdx);
+        headerRow.setHeightInPoints(30f);
+        for (int c = 0; c < DEMAND_CANDIDATE_COLUMNS.length; c++) {
+            Cell cell = headerRow.createCell(c);
+            cell.setCellValue(DEMAND_CANDIDATE_COLUMNS[c][0]);
+            cell.setCellStyle(s.header);
+            ws.setColumnWidth(c, Integer.parseInt(DEMAND_CANDIDATE_COLUMNS[c][1]) * 256);
+        }
+        ws.createFreezePane(0, headerRowIdx + 1);
+
+        int row = headerRowIdx + 1;
+        for (DemandEnriched dem : shown) {
+            List<ShortlistRow> candidateRows = capDemandRows(byDemand.getOrDefault(dem.getDemandId(), List.of()));
+            row = writeDemandBlock(ws, s, row, dem, candidateRows);
+        }
+    }
+
+    private int writeDemandBlock(Sheet ws, Styles s, int row, DemandEnriched dem, List<ShortlistRow> candidateRows) {
+        ShortlistRow first = candidateRows.get(0);
+        String masMappingNote = first.masMappingNote();
+        String frontendAnchorNote = first.frontendAnchorNote();
+        String flagSuffix = "";
+        if (masMappingNote != null && !masMappingNote.isBlank()) {
+            flagSuffix += "  |  ⚠ MAS Mapping check: " + masMappingNote;
+        }
+        if (frontendAnchorNote != null && !frontendAnchorNote.isBlank()) {
+            flagSuffix += "  |  ⚠ Frontend Anchor check: " + frontendAnchorNote;
+        }
+
+        Row headerRow = ws.createRow(row);
+        headerRow.setHeightInPoints(20f);
+        Cell cell = headerRow.createCell(0);
+        cell.setCellValue(dem.getDemandId() + "  —  " + nz(dem.getCustomer()) + " / " + nz(dem.getProjectName())
+                + "  |  " + combinePersona(first.demandPersona(), first.demandSubPersona())
+                + "  |  Band: " + nz(dem.getBand())
+                + "  |  Location: " + nz(dem.getLocation())
+                + "  |  Open positions: " + fmtNum(dem.getBalancePositions())
+                + "  |  Due: " + nz(dem.getDueCategory()) + " (" + nz(first.ageingBucket()) + ")"
+                + flagSuffix);
+        cell.setCellStyle(s.empHeader);
+        ws.addMergedRegion(new CellRangeAddress(row, row, 0, DEMAND_CANDIDATE_COLUMNS.length - 1));
+        row++;
+
+        for (ShortlistRow r : candidateRows) {
+            Row dataRow = ws.createRow(row);
+            String tier = r.overallTier();
+            Object[] values = {
+                    tier, r.employeeName(), r.employeeBand(), r.employeeLocation(), fmtNum(r.employeeBenchAgeing()),
+                    r.skillCollapsed(), r.bandCollapsed(), r.locationCollapsed(), r.assessmentCollapsed(),
+                    r.skillExpanded(), r.bandExpanded(), r.locationExpanded(), r.assessmentExpanded(), r.oneLiner(),
+                    nz(r.masMappingCrossCheckNote()), nz(r.additionalRequest())
+            };
+            for (int c = 0; c < values.length; c++) {
+                Cell dc = dataRow.createCell(c);
+                setValue(dc, values[c]);
+                if (c == 0) {
+                    dc.setCellStyle(s.tierCell(tier));
+                } else if (c == DCOL_MAS_MAPPING_CROSS_CHECK && values[c] != null && !values[c].toString().isEmpty()) {
+                    dc.setCellStyle(s.reviewFlagCell());
+                } else {
+                    boolean wrap = (c == 5 || c == 9 || c == 10 || c == 11 || c == 13 || c == 15);
+                    dc.setCellStyle(s.bodyCell(false, wrap));
+                }
+            }
+            row++;
+        }
+        return row;
+    }
+
+    private void writeNoCoverageSheet(XSSFWorkbook wb, Styles s, List<DemandEnriched> noCoverage,
+                                       Map<String, List<ShortlistRow>> byDemand) {
+        Sheet ws = wb.createSheet("No Coverage");
+        ws.setDisplayGridlines(false);
+
+        Row r1 = ws.createRow(0);
+        Cell title = r1.createCell(0);
+        title.setCellValue("Demands with no Strong/Good bench candidate right now");
+        title.setCellStyle(s.title);
+        ws.addMergedRegion(new CellRangeAddress(0, 0, 0, 4));
+
+        Row r2 = ws.createRow(1);
+        Cell subtitle = r2.createCell(0);
+        subtitle.setCellValue("Sorted most urgent first. These need external hiring or escalation, not a candidate "
+                + "shortlist — a Weak/Excluded-only row means someone technically matched but not well enough to "
+                + "propose; a 'no candidates at all' row means no Phase 1 employee shares this persona in the "
+                + "current data.");
+        subtitle.setCellStyle(s.subtitle);
+        ws.addMergedRegion(new CellRangeAddress(1, 1, 0, NO_COVERAGE_COLUMNS.length - 1));
+
+        int headerRowIdx = 3;
+        Row headerRow = ws.createRow(headerRowIdx);
+        headerRow.setHeightInPoints(30f);
+        for (int c = 0; c < NO_COVERAGE_COLUMNS.length; c++) {
+            Cell cell = headerRow.createCell(c);
+            cell.setCellValue(NO_COVERAGE_COLUMNS[c][0]);
+            cell.setCellStyle(s.header);
+            ws.setColumnWidth(c, Integer.parseInt(NO_COVERAGE_COLUMNS[c][1]) * 256);
+        }
+        ws.createFreezePane(0, headerRowIdx + 1);
+
+        int row = headerRowIdx + 1;
+        for (DemandEnriched dem : noCoverage) {
+            List<ShortlistRow> rows = byDemand.getOrDefault(dem.getDemandId(), List.of());
+            String why;
+            if (rows.isEmpty()) {
+                why = "No Phase 1 employee shares this persona at all right now.";
+            } else {
+                long weak = rows.stream().filter(r -> "Weak".equals(r.overallTier())).count();
+                long excluded = rows.stream().filter(r -> "Excluded".equals(r.overallTier())).count();
+                why = "Candidates exist but none Strong/Good — " + weak + " Weak, " + excluded
+                        + " Excluded (band/sub-persona mismatch) in scope. See the employee-centric sheet for detail.";
+            }
+            String persona = rows.isEmpty() ? nz(dem.getPersona() == null ? null : dem.getPersona().getName())
+                    : combinePersona(rows.get(0).demandPersona(), rows.get(0).demandSubPersona());
+            Row dataRow = ws.createRow(row);
+            Object[] values = {
+                    dem.getDemandId(), dem.getCustomer(), dem.getProjectName(), persona, dem.getBand(),
+                    dem.getLocation(), fmtNum(dem.getBalancePositions()), dem.getDueCategory(), dem.getNewAgeing(), why
+            };
+            for (int c = 0; c < values.length; c++) {
+                Cell dc = dataRow.createCell(c);
+                setValue(dc, values[c]);
+                dc.setCellStyle(s.bodyCell(false, c == NO_COVERAGE_COLUMNS.length - 1));
+            }
+            row++;
+        }
+    }
+
+    private void writeDemandReadMeSheet(XSSFWorkbook wb, Styles s, int totalClassifiedDemand, int actionableCount,
+                                         int shownCount, int overflow, int noCoverageCount, int maxDemands) {
+        Sheet rm = wb.createSheet("Read Me");
+        rm.setColumnWidth(0, 100 * 256);
+        int[] r = {0};
+
+        addLine(rm, s.title, r, "Demand & Supply Mapping — Matching Engine (by Demand): Methodology & Coverage Notes");
+        r[0]++;
+        addLine(rm, s.bold, r, "Why this export exists");
+        addLine(rm, s.body, r, "The employee-centric 'Phase 1 Shortlist' workbook groups by employee, which is the "
+                + "right view for the team proposing supply but the wrong one for the team fulfilling a specific "
+                + "demand — they'd have to scan every employee to find candidates for one requisition. This export "
+                + "is the same matching engine and tiers, regrouped around one demand per block.");
+        r[0]++;
+
+        addLine(rm, s.bold, r, "Scope (this export)");
+        addLine(rm, s.body, r, totalClassifiedDemand + " classified, active demand rows on file; " + actionableCount
+                + " have at least one Strong/Good candidate right now (\"actionable\"); " + noCoverageCount
+                + " do not and are listed on the 'No Coverage' tab instead.");
+        r[0]++;
+
+        addLine(rm, s.bold, r, "Weekly worklist cap");
+        addLine(rm, s.body, r, "Of the " + actionableCount + " actionable demands, the " + shownCount
+                + " most urgent (by ageing rank, then open positions) are shown on the main tab this run"
+                + (overflow > 0 ? "; " + overflow + " more are actionable but waiting for a future run" : "")
+                + ". The cap is currently " + maxDemands + " — a starting placeholder, not a measured capacity "
+                + "figure; adjust it (the 'limit' parameter on this export) once real weekly throughput is known.");
+        r[0]++;
+
+        addLine(rm, s.bold, r, "Per-demand candidate cap");
+        addLine(rm, s.body, r, "All Strong candidates kept; top " + MAX_GOOD_PER_DEMAND + " Good candidates kept, "
+                + "ranked by assessment strength then bench ageing (longest-benched first) then name. Weak/Excluded "
+                + "candidates are never shown here — a demand only appears on this tab because it already has a "
+                + "Strong/Good candidate, so there's no empty-tier case to fall back to the way the employee-centric "
+                + "sheet has. See the 'No Coverage' tab for demands where only Weak/Excluded candidates exist.");
+        r[0]++;
+
+        addLine(rm, s.bold, r, "Overall Signal tiers");
+        addLine(rm, s.body, r, "Same definitions as the employee-centric workbook: Strong = same persona, core "
+                + "skills present, band exact, same city. Good = persona match with exactly one thing discounted "
+                + "(one band above, different city, or a named-accessory gap).");
+    }
+
+    /**
      * Same broad-persona-family candidate scope as MatchingRunService.candidateDemandsFor() — duplicated rather than
      * shared to keep this export independently readable and to avoid widening MatchingRunService's method
      * visibility for a single caller; see this class's own Javadoc for why a fresh pass is computed here at all.
@@ -196,6 +532,7 @@ public class ShortlistWorkbookService {
                     emp.getEmployeeId(), emp.getEmployeeName(),
                     empClassification.persona(), empClassification.subPersona(), emp.getCompleteness(),
                     emp.getSubBand(), emp.getLocation(), emp.getPrimeNv(), emp.getAfdStatus(), emp.getBenchAgeingDays(),
+                    assessment.rank(),
                     dem.getDemandId(), dem.getCustomer(), dem.getProjectName(),
                     demClassification.persona(), demClassification.subPersona(), dem.getBand(), dem.getLocation(),
                     dem.getBalancePositions(), dem.getDueCategory(), dem.getNewAgeing(),
