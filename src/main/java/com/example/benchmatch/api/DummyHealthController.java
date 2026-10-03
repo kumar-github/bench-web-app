@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DummyHealthController {
 
     @GetMapping
-    public ResponseEntity<Void> healthCheck() {
-        return ResponseEntity.ok().build();
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("OK");
     }
 }
