@@ -57,6 +57,16 @@
     --bm-red-ink: #8b3a3a;
     --bm-red-strong: #9d5b5b;
     --bm-teal: #0f766e;
+
+    /* Review queue urgency palette — distinct from the dashboard's --bm-red-strong/--bm-amber-*
+       tokens above (those are used by Dashboard's own queue rows and have different literal
+       values), lifted directly from the approved Demand Review mock (Main.dc.html). */
+    --bm-rev-overdue: #b42318;
+    --bm-rev-duesoon: #b7791f;
+    --bm-rev-ontrack: #2e7d32;
+    --bm-rev-exhausted: #9aa1ab;
+    --bm-rev-cta: #1c2b45;
+    --bm-rev-cta-hover: #142033;
 }
 
 .bm-shell {
@@ -560,40 +570,301 @@
     background: transparent;
 }
 
-/* The Review queue's Grid: one component column styled to look like the plain queue-row list
-   (card border, no header bar, no cell borders) rather than a conventional data table — see
-   ReviewQueueView's Javadoc for why this is a Grid at all (virtualized rendering + internal
-   scroll at 400+ rows) rather than the Div list Dashboard's small "needs attention" card uses. */
-.bm-review-grid {
+/* ---- Review queue (landing page), rebuilt 2026-10-05 to match Main.dc.html pixel-for-pixel ----
+   Superseded the Grid-based approach (.bm-review-grid/.bm-badge-neutral, removed) once the actual
+   mock turned out to specify plain paginated cards (20/page, Prev/1/2/3/Next) rather than a long
+   virtualized scroll — see ReviewQueueView's Javadoc. Real client-side pagination over an
+   in-memory list is fine at this row count (hundreds, not thousands — same reasoning
+   DemandReviewService.queue()'s own Javadoc already gives for staying a plain List). */
+
+.bm-rev-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bm-rev-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: var(--bm-muted-ink);
+}
+
+.bm-rev-stats strong {
+    font-size: 15px;
+    color: var(--bm-ink);
+}
+
+.bm-rev-stat-overdue {
+    color: var(--bm-rev-overdue);
+    font-weight: 600;
+}
+
+.bm-rev-stat-duesoon {
+    color: var(--bm-rev-duesoon);
+    font-weight: 600;
+}
+
+.bm-rev-stat-nocoverage {
+    color: var(--bm-rev-cta);
+    font-weight: 600;
+}
+
+.bm-rev-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #ffffff;
     border: 1px solid var(--bm-border);
     border-radius: 10px;
-    overflow: hidden;
-    --lumo-border-radius-m: 0;
+    padding: 10px 14px;
 }
 
-.bm-review-grid::part(header-row) {
-    display: none;
+.bm-rev-search {
+    flex: 1 1 260px;
+    min-width: 220px;
 }
 
-.bm-review-grid::part(row) {
-    background: #ffffff;
+.bm-rev-search input {
+    background: var(--bm-content-bg);
 }
 
-.bm-review-grid::part(cell) {
-    border: none;
-    padding: 0;
-}
-
-/* Neutral count badge (e.g. "6 undecided") — most queue rows are this, and making every single
-   one red (.bm-badge-danger) would bury the rows that actually need urgent attention
-   (EXHAUSTED/ALL DECIDED) in noise. */
-.bm-badge-neutral {
-    background: var(--bm-border-faint);
+.bm-rev-legend {
+    display: flex;
+    gap: 18px;
+    font-size: 12px;
     color: var(--bm-muted-ink);
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 5px;
+    padding: 0 4px;
+}
+
+.bm-rev-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bm-rev-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.bm-rev-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bm-rev-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    border-left: 4px solid var(--bm-rev-ontrack);
+    border-radius: 10px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.bm-rev-row:hover {
+    background: var(--bm-field-bg);
+    border-color: #c9cdd4;
+    cursor: pointer;
+}
+
+.bm-rev-row--overdue {
+    border-left-color: var(--bm-rev-overdue);
+}
+
+.bm-rev-row--duesoon {
+    border-left-color: var(--bm-rev-duesoon);
+}
+
+.bm-rev-row--exhausted {
+    background: #fbf9f4;
+    border-color: #ede4cc;
+    border-left-color: var(--bm-rev-exhausted);
+}
+
+.bm-rev-row--exhausted:hover {
+    background: #f6f1e6;
+}
+
+.bm-rev-urgency {
+    min-width: 150px;
     flex-shrink: 0;
+}
+
+.bm-rev-urgency-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    margin-bottom: 4px;
+    color: var(--bm-rev-ontrack);
+}
+
+.bm-rev-urgency-label--overdue {
+    color: var(--bm-rev-overdue);
+}
+
+.bm-rev-urgency-label--duesoon {
+    color: var(--bm-rev-duesoon);
+}
+
+.bm-rev-urgency-label--exhausted {
+    color: var(--bm-muted-ink);
+}
+
+.bm-rev-id {
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.bm-rev-info {
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+
+.bm-rev-title {
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.bm-rev-sub {
+    font-size: 12.5px;
+    color: var(--bm-muted-ink);
+    margin-top: 2px;
+}
+
+.bm-rev-positions {
+    min-width: 120px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.bm-rev-positions-main {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.bm-rev-positions-sub {
+    font-size: 12px;
+    color: var(--bm-muted-ink);
+}
+
+.bm-rev-positions-sub--warn {
+    color: var(--bm-rev-duesoon);
+}
+
+.bm-rev-pills {
+    min-width: 170px;
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.bm-rev-pill {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 6px;
     white-space: nowrap;
+}
+
+.bm-rev-pill-strong {
+    background: #e8f3ec;
+    color: #1e7a3c;
+}
+
+.bm-rev-pill-good {
+    background: #fef3dc;
+    color: #9a6b12;
+}
+
+.bm-rev-pill-zero {
+    background: #f1f2f4;
+    color: #8a919c;
+}
+
+.bm-rev-cta {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bm-rev-cta);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.bm-rev-cta--muted {
+    color: var(--bm-muted-ink);
+}
+
+.bm-rev-note {
+    font-size: 12.5px;
+    color: #8a919c;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bm-rev-note-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--bm-rev-exhausted);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.bm-rev-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+}
+
+.bm-rev-pagination-caption {
+    font-size: 12.5px;
+    color: #8a919c;
+}
+
+.bm-rev-pagination-pages {
+    display: flex;
+    gap: 6px;
+}
+
+.bm-rev-page-btn {
+    font-size: 13px;
+    padding: 6px 11px;
+    border-radius: 7px;
+    border: 1px solid #d7dbe0;
+    color: var(--bm-muted-ink);
+    background: #ffffff;
+    cursor: pointer;
+    min-width: 34px;
+}
+
+.bm-rev-page-btn:hover:not(:disabled) {
+    background: var(--bm-field-bg);
+}
+
+.bm-rev-page-btn:disabled {
+    color: #c9cdd4;
+    cursor: default;
+}
+
+.bm-rev-page-btn--active {
+    background: var(--bm-rev-cta);
+    color: #ffffff;
+    font-weight: 600;
+    border-color: var(--bm-rev-cta);
 }

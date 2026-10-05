@@ -3,10 +3,15 @@ package com.example.benchmatch.view;
 import com.example.benchmatch.review.DemandReviewService;
 import com.example.benchmatch.review.dto.DemandLifecycleState;
 import com.example.benchmatch.review.dto.ReviewQueueItemDto;
-import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.textfield.TextFieldVariant;
+import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
@@ -18,95 +23,333 @@ import java.util.List;
  * fully Filled yet, longest-overdue first (DemandReviewService.queue()'s Javadoc). Clicking a row
  * opens {@link ReviewWorkspaceView} for that one demand.
  * <p>
- * A Grid with a single component column — not a plain {@code Div} of rows — rendering each row in
- * the same card style as Dashboard's queue rows ({@code .bm-queue-row} etc.). Found 2026-10-05:
- * with real data this queue runs into the hundreds of demands (458 in the reporter's dataset), and
- * a plain Div list renders every row as real DOM, which (a) is slow to render and scroll, and
- * (b) at that height overflowed {@code .bm-outlet} before that was fixed to scroll internally (see
- * styles.css's {@code .bm-shell}/{@code .bm-outlet} comments) — the sidebar visually "ending"
- * partway down the page was a symptom of that overflow, not of this view specifically. Grid
- * virtualizes rendering (only visible rows exist in the DOM) regardless of whether its items come
- * from an in-memory list or a lazy provider — at this row count an in-memory
- * {@code grid.setItems(list)} is enough; DemandReviewService.queue() stays a plain
- * {@code List<ReviewQueueItemDto>} rather than growing a Pageable-aware counterpart the way
- * SupplyQueryService/DemandQueryService had to (see GridPagingUtil's Javadoc for why THOSE needed
- * one — this list tops out in the hundreds, not the thousands those grids page over).
+ * Rebuilt 2026-10-05 to match the approved wireframe (Main.dc.html, "Demand Queue (landing)"
+ * artboard) structurally, not just a Dashboard-style card list: urgency-colored left-border rows
+ * with a dot+label badge, header stat line, legend, a real search box, and classic page-based
+ * pagination (20 rows/page, Prev/1/2/3/Next) — not infinite scroll or Grid virtualization. A
+ * same-day earlier attempt used a Vaadin {@code Grid} for virtualized rendering once the row count
+ * turned out to be in the hundreds (458 in the reporter's dataset); that solved the "very long
+ * list to scroll" complaint mechanically but didn't match the mock's actual design, which never
+ * intended infinite scroll at all — paging 20 at a time is both the correct UX per the mock AND
+ * still only renders ~20 rows of real DOM at a time, so there's no virtualization need left once
+ * paging is done properly. {@code DemandReviewService.queue()} stays a plain in-memory
+ * {@code List<ReviewQueueItemDto>}; paging/search/urgency grouping all happen here, client-side,
+ * over that list — fine at this row count (hundreds, not thousands), same reasoning that list's own
+ * Javadoc already gives for not needing a Pageable-aware counterpart.
  */
 @Route(value = "review", layout = MainLayout.class)
 @PageTitle("Review")
 public class ReviewQueueView extends VerticalLayout {
 
+    private static final int PAGE_SIZE = 20;
+
+    private final DemandReviewService reviewService;
+    private final List<ReviewQueueItemDto> queue;
+
+    private final TextField search = new TextField();
+    private final Div rowsContainer = new Div();
+    private final Div paginationContainer = new Div();
+
+    private List<ReviewQueueItemDto> filtered;
+    private int page = 0;
+
     public ReviewQueueView(DemandReviewService reviewService) {
+        this.reviewService = reviewService;
+        this.queue = reviewService.queue();
+        this.filtered = queue;
+
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
-        List<ReviewQueueItemDto> queue = reviewService.queue();
+        add(buildHeader());
+        add(buildToolbar());
+        add(buildLegend());
 
-        Span title = new Span("Demand Review Queue");
+        rowsContainer.addClassName("bm-rev-rows");
+        add(rowsContainer);
+        setFlexGrow(1, rowsContainer);
+
+        add(buildNote());
+
+        paginationContainer.setWidthFull();
+        add(paginationContainer);
+
+        render();
+    }
+
+    private Div buildHeader() {
+        Span title = new Span("Demand Review");
         title.addClassName("bm-card-title-lg");
-        Span subtitle = new Span(queue.size() + " demand(s) with at least one Strong/Good candidate — most overdue first");
-        subtitle.addClassName("bm-card-subtitle");
-        Div header = new Div(title, subtitle);
-        header.addClassName("bm-card-title-block");
-        add(header);
 
-        Grid<ReviewQueueItemDto> grid = buildGrid();
-        grid.setItems(queue);
-        add(grid);
-        setFlexGrow(1, grid);
+        int overdue = (int) queue.stream().filter(i -> i.ageingRank() == 0).count();
+        int dueSoon = (int) queue.stream().filter(i -> i.ageingRank() == 1).count();
+        int noCoverage = reviewService.noCoverageCount();
 
-        if (queue.isEmpty()) {
-            Span empty = new Span("Nothing to review right now.");
+        Span totalCount = new Span(String.valueOf(queue.size()));
+        totalCount.getStyle().set("font-weight", "700").set("color", "var(--bm-ink)").set("font-size", "15px");
+        Span total = new Span(totalCount, new Span(" demand(s) need review"));
+        Span overdueSpan = new Span(overdue + " overdue");
+        overdueSpan.addClassName("bm-rev-stat-overdue");
+        Span dueSoonSpan = new Span(dueSoon + " due this week");
+        dueSoonSpan.addClassName("bm-rev-stat-duesoon");
+        Span noCoverageSpan = new Span(noCoverage + " have zero candidate");
+        noCoverageSpan.addClassName("bm-rev-stat-nocoverage");
+
+        Div stats = new Div(total, overdueSpan, dueSoonSpan, noCoverageSpan);
+        stats.addClassName("bm-rev-stats");
+
+        Div header = new Div(title, stats);
+        header.addClassName("bm-rev-header");
+        return header;
+    }
+
+    private Div buildToolbar() {
+        search.setPlaceholder("Search demand ID, customer, project…");
+        search.setClearButtonVisible(true);
+        search.setValueChangeMode(ValueChangeMode.LAZY);
+        search.addThemeVariants(TextFieldVariant.LUMO_SMALL);
+        search.addClassName("bm-rev-search");
+        search.addValueChangeListener(e -> {
+            applyFilter(e.getValue());
+            page = 0;
+            render();
+        });
+
+        Div toolbar = new Div(search);
+        toolbar.addClassName("bm-rev-toolbar");
+        return toolbar;
+    }
+
+    private Div buildLegend() {
+        Div legend = new Div(
+                legendItem("var(--bm-rev-overdue)", "Overdue"),
+                legendItem("var(--bm-rev-duesoon)", "Due soon"),
+                legendItem("var(--bm-rev-ontrack)", "On track")
+        );
+        legend.addClassName("bm-rev-legend");
+        return legend;
+    }
+
+    private Div legendItem(String color, String label) {
+        Span dot = new Span();
+        dot.addClassName("bm-rev-legend-dot");
+        dot.getStyle().set("background", color);
+        Div item = new Div(dot, new Span(label));
+        item.addClassName("bm-rev-legend-item");
+        return item;
+    }
+
+    private Div buildNote() {
+        Span dot = new Span();
+        dot.addClassName("bm-rev-note-dot");
+        Span text = new Span("Exhausted = every Strong/Good candidate already Proposed or Rejected, "
+                + "but positions remain open — this is the live signal for proactive hiring, not a stuck queue item.");
+        Div note = new Div(dot, text);
+        note.addClassName("bm-rev-note");
+        return note;
+    }
+
+    private void applyFilter(String term) {
+        String t = term == null ? "" : term.trim().toLowerCase();
+        if (t.isEmpty()) {
+            filtered = queue;
+            return;
+        }
+        filtered = queue.stream()
+                .filter(i -> containsIgnoreCase(i.demandId(), t)
+                        || containsIgnoreCase(i.customer(), t)
+                        || containsIgnoreCase(i.projectName(), t))
+                .toList();
+    }
+
+    private boolean containsIgnoreCase(String value, String term) {
+        return value != null && value.toLowerCase().contains(term);
+    }
+
+    private void render() {
+        rowsContainer.removeAll();
+
+        if (filtered.isEmpty()) {
+            Span empty = new Span(queue.isEmpty() ? "Nothing to review right now." : "No demands match your search.");
             empty.addClassName("bm-card-subtitle");
-            add(empty);
+            rowsContainer.add(empty);
+            paginationContainer.removeAll();
+            return;
         }
+
+        int totalPages = (int) Math.ceil(filtered.size() / (double) PAGE_SIZE);
+        if (page >= totalPages) {
+            page = totalPages - 1;
+        }
+        int from = page * PAGE_SIZE;
+        int to = Math.min(from + PAGE_SIZE, filtered.size());
+
+        for (ReviewQueueItemDto item : filtered.subList(from, to)) {
+            rowsContainer.add(buildRow(item));
+        }
+
+        renderPagination(from, to, totalPages);
     }
 
-    private Grid<ReviewQueueItemDto> buildGrid() {
-        Grid<ReviewQueueItemDto> grid = new Grid<>();
-        grid.addClassName("bm-review-grid");
-        grid.addComponentColumn(this::buildRow).setAutoWidth(false).setFlexGrow(1);
-        grid.setSizeFull();
-        grid.setAllRowsVisible(false);
-        return grid;
+    private void renderPagination(int from, int to, int totalPages) {
+        paginationContainer.removeAll();
+
+        Span caption = new Span("Showing " + (from + 1) + "–" + to + " of " + filtered.size()
+                + ", sorted most urgent first");
+        caption.addClassName("bm-rev-pagination-caption");
+
+        Div pages = new Div();
+        pages.addClassName("bm-rev-pagination-pages");
+
+        pages.add(pageButton("Prev", page - 1, page > 0));
+        // Compact page-number window around the current page, capped at 5 buttons, same idea as
+        // GridPagingUtil's own pager — this list only needs the same treatment client-side here.
+        int windowStart = Math.max(0, Math.min(page - 2, totalPages - 5));
+        int windowEnd = Math.min(totalPages, windowStart + 5);
+        for (int p = windowStart; p < windowEnd; p++) {
+            Button btn = pageButton(String.valueOf(p + 1), p, true);
+            if (p == page) {
+                btn.addClassName("bm-rev-page-btn--active");
+            }
+            pages.add(btn);
+        }
+        pages.add(pageButton("Next", page + 1, page < totalPages - 1));
+
+        Div pagination = new Div(caption, pages);
+        pagination.addClassName("bm-rev-pagination");
+        paginationContainer.removeAll();
+        paginationContainer.add(pagination);
     }
 
-    private Div buildRow(ReviewQueueItemDto item) {
-        Div avatar = new Div(new Span(String.valueOf(item.balancePositions() == null ? 0 : item.balancePositions())));
-        avatar.addClassName("bm-queue-avatar");
+    private Button pageButton(String label, int targetPage, boolean enabled) {
+        Button btn = new Button(label);
+        btn.addClassName("bm-rev-page-btn");
+        btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        btn.setEnabled(enabled);
+        btn.addClickListener(e -> {
+            page = targetPage;
+            render();
+        });
+        return btn;
+    }
 
-        Span name = new Span(item.demandId() + " — " + label(item));
-        name.addClassName("bm-queue-name");
-        Span meta = new Span(metaLine(item));
-        meta.addClassName("bm-queue-meta");
-        Div nameLine = new Div(name, meta);
-        nameLine.addClassName("bm-queue-name-line");
+    private Component buildRow(ReviewQueueItemDto item) {
+        boolean exhausted = item.lifecycleState() == DemandLifecycleState.EXHAUSTED;
 
-        Div row = new Div(avatar, nameLine);
-        row.addClassName("bm-queue-row");
-
-        if (item.lifecycleState() == DemandLifecycleState.EXHAUSTED) {
-            Span badge = new Span("EXHAUSTED — NEEDS HIRING");
-            badge.addClassName("bm-badge-danger");
-            row.add(badge);
-        } else if (item.undecidedStrongGoodCount() == 0) {
-            Span badge = new Span("ALL CANDIDATES DECIDED");
-            badge.addClassName("bm-badge-danger");
-            row.add(badge);
+        Div urgency = new Div();
+        urgency.addClassName("bm-rev-urgency");
+        Span urgencyLabel = new Span(urgencyLabelText(item, exhausted));
+        urgencyLabel.addClassName("bm-rev-urgency-label");
+        if (exhausted) {
+            urgencyLabel.addClassName("bm-rev-urgency-label--exhausted");
         } else {
-            // Neutral, not alarming — most rows land here, and every row being red noise defeats
-            // the point of a danger badge (it should mean "look here first", not "every row").
-            Span badge = new Span(item.undecidedStrongGoodCount() + " undecided");
-            badge.addClassName("bm-badge-neutral");
-            row.add(badge);
+            String modifier = urgencyClass(item.ageingRank());
+            if (!modifier.isEmpty()) {
+                urgencyLabel.addClassName(modifier);
+            }
+        }
+        Span demandId = new Span(item.demandId());
+        demandId.addClassName("bm-rev-id");
+        urgency.add(urgencyLabel, demandId);
+
+        Div info = new Div();
+        info.addClassName("bm-rev-info");
+        Span infoTitle = new Span(classificationLine(item));
+        infoTitle.addClassName("bm-rev-title");
+        Span infoSub = new Span(customerLine(item));
+        infoSub.addClassName("bm-rev-sub");
+        info.add(infoTitle, infoSub);
+
+        int positions = item.balancePositions() == null ? 0 : item.balancePositions();
+        Div positionsBlock = new Div();
+        positionsBlock.addClassName("bm-rev-positions");
+        Span positionsMain = new Span(positions + (positions == 1 ? " position" : " positions"));
+        positionsMain.addClassName("bm-rev-positions-main");
+        Span positionsSub = new Span(item.approvedCount() + " of " + positions + " filled"
+                + (exhausted ? " — no one left to decide on" : ""));
+        positionsSub.addClassName(exhausted ? "bm-rev-positions-sub bm-rev-positions-sub--warn" : "bm-rev-positions-sub");
+        positionsBlock.add(positionsMain, positionsSub);
+
+        Div pills = new Div();
+        pills.addClassName("bm-rev-pills");
+        if (exhausted) {
+            Span decided = new Span("All candidates decided");
+            decided.addClassName("bm-rev-pill");
+            decided.addClassName("bm-rev-pill-zero");
+            pills.add(decided);
+        } else {
+            Span strong = new Span(item.strongCount() + " Strong");
+            strong.addClassName("bm-rev-pill");
+            strong.addClassName(item.strongCount() > 0 ? "bm-rev-pill-strong" : "bm-rev-pill-zero");
+            Span good = new Span(item.goodCount() + " Good");
+            good.addClassName("bm-rev-pill");
+            good.addClassName(item.goodCount() > 0 ? "bm-rev-pill-good" : "bm-rev-pill-zero");
+            pills.add(strong, good);
         }
 
-        RouterLink open = new RouterLink("Open →", ReviewWorkspaceView.class, item.demandId());
-        open.addClassName("bm-queue-open");
-        row.add(open);
+        Span ctaText = new Span(exhausted ? "Flag for hiring" : "Review");
+        Span arrow = new Span("→");
+        Div cta = new Div(ctaText, arrow);
+        cta.addClassName("bm-rev-cta");
+        if (exhausted) {
+            cta.addClassName("bm-rev-cta--muted");
+        }
 
+        // Text-plus-components constructor, same overload ReviewQueueView already relied on before
+        // this rewrite ("Open →") — a RouterLink that also carries a navigation parameter has no
+        // no-text overload, so an empty-string text node is unavoidable; it renders as nothing.
+        RouterLink row = new RouterLink("", ReviewWorkspaceView.class, item.demandId());
+        row.addClassName("bm-rev-row");
+        row.addClassName(rowUrgencyClass(item, exhausted));
+        row.add(urgency, info, positionsBlock, pills, cta);
         return row;
+    }
+
+    private String rowUrgencyClass(ReviewQueueItemDto item, boolean exhausted) {
+        if (exhausted) {
+            return "bm-rev-row--exhausted";
+        }
+        return switch (item.ageingRank()) {
+            case 0 -> "bm-rev-row--overdue";
+            case 1 -> "bm-rev-row--duesoon";
+            default -> "bm-rev-row--ontrack";
+        };
+    }
+
+    private String urgencyLabelText(ReviewQueueItemDto item, boolean exhausted) {
+        if (exhausted) {
+            return "● EXHAUSTED";
+        }
+        String raw = item.newAgeing() != null && !item.newAgeing().isBlank()
+                ? item.newAgeing()
+                : item.dueCategory();
+        if (raw == null || raw.isBlank()) {
+            raw = item.ageingRank() == 0 ? "Overdue" : item.ageingRank() == 1 ? "Due soon" : "On track";
+        }
+        return "● " + raw.toUpperCase();
+    }
+
+    private String urgencyClass(int rank) {
+        return rank == 0 ? "bm-rev-urgency-label--overdue" : rank == 1 ? "bm-rev-urgency-label--duesoon" : "";
+    }
+
+    private String classificationLine(ReviewQueueItemDto item) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(label(item));
+        if (item.band() != null && !item.band().isBlank()) {
+            sb.append(" · ").append(item.band());
+        }
+        if (item.location() != null && !item.location().isBlank()) {
+            sb.append(" · ").append(item.location());
+        }
+        return sb.toString();
+    }
+
+    private String customerLine(ReviewQueueItemDto item) {
+        String customer = item.customer() == null || item.customer().isBlank() ? "—" : item.customer();
+        String project = item.projectName() == null || item.projectName().isBlank() ? null : item.projectName();
+        return project == null ? customer : (customer + " — " + project);
     }
 
     private String label(ReviewQueueItemDto item) {
@@ -114,13 +357,5 @@ public class ReviewQueueView extends VerticalLayout {
             return item.persona() + " - " + item.subPersona();
         }
         return item.persona() == null ? (item.clusterNameRaw() == null ? "—" : item.clusterNameRaw()) : item.persona();
-    }
-
-    private String metaLine(ReviewQueueItemDto item) {
-        return (item.location() == null ? "—" : item.location())
-                + "  ·  " + (item.band() == null ? "—" : item.band())
-                + "  ·  Due: " + (item.dueCategory() == null ? "—" : item.dueCategory())
-                + "  ·  " + item.strongCount() + " Strong / " + item.goodCount() + " Good / " + item.weakCount() + " Weak"
-                + "  ·  Positions open: " + (item.balancePositions() == null ? 0 : item.balancePositions());
     }
 }

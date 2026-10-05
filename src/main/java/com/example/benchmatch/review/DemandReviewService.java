@@ -108,6 +108,26 @@ public class DemandReviewService {
                 .toList();
     }
 
+    /**
+     * Count of active, classified demands with ZERO Strong/Good candidates — the mock's "89 have
+     * zero candidate" header stat (Main.dc.html). These are exactly the demands {@link #toQueueItem}
+     * filters out of the queue entirely (not actionable from this screen) — they belong on a
+     * future "Coverage Log"/"No Coverage" view, not yet built (today's sidebar item is a disabled
+     * "SOON" placeholder), so this is currently just a count, not a link target.
+     */
+    @Transactional(readOnly = true)
+    public int noCoverageCount() {
+        List<DemandEnriched> demands = demandRepository.findByIsActiveTrue().stream()
+                .filter(d -> d.getPersona() != null)
+                .toList();
+        Map<String, List<MatchCandidate>> candidatesByDemand = matchCandidateRepository.findAll().stream()
+                .collect(Collectors.groupingBy(MatchCandidate::getDemandId));
+        return (int) demands.stream()
+                .filter(d -> candidatesByDemand.getOrDefault(d.getDemandId(), List.of()).stream()
+                        .noneMatch(c -> STRONG_GOOD.contains(c.getOverallTier())))
+                .count();
+    }
+
     @Transactional(readOnly = true)
     public ReviewWorkspaceDto workspace(String demandId) {
         DemandEnriched demand = demandRepository.findById(demandId)
