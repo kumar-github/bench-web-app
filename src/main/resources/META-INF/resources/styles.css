@@ -66,6 +66,21 @@
        (Supply/Demand/Upload/Shortlist) inherits Aura's own adaptive text color instead of a
        hardcoded ink that would stay dark even when the background goes dark. */
     background: var(--bm-content-bg);
+    /* Pinned to the viewport (not just min-height, which MainLayout also sets inline) with
+       overflow hidden here, so a tall ROUTED VIEW can never push the whole document taller than
+       one screen. Found 2026-10-05: Review's queue (hundreds of plain-Div rows, no Grid) was the
+       first view long enough to overflow .bm-shell's old unbounded height, and because the
+       sidebar is a normal in-flow flex child (not position:sticky/fixed), once the document grew
+       taller than one viewport the WHOLE shell — sidebar included — scrolled with it, so the
+       sidebar visually "ended" after about one screen of scrolling even though its navy
+       background should have run the full page. Fix: the shell itself never exceeds 100vh, and
+       .bm-outlet below is the one thing allowed to scroll internally, so header + sidebar now stay
+       fixed in place the way the approved mock always showed them, regardless of how long a given
+       routed view's content gets. Supply/Demand/Shortlist already use Vaadin Grid's own internal
+       virtual scroll and never relied on page-level overflow, so this was latent until Review.
+    */
+    height: 100vh;
+    overflow: hidden;
 }
 
 /* ---- Sidebar ---- */
@@ -187,6 +202,11 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Matches .bm-shell's now-fixed height — see that rule's comment. Without this, this column
+       (and .bm-outlet inside it) would still be free to grow past 100vh even though the shell
+       itself is clipped, which would just move the overflow problem down one level. */
+    height: 100%;
+    min-height: 0;
 }
 
 .bm-header {
@@ -251,6 +271,12 @@
        fully covers the outlet even when the dashboard's own content is shorter than the
        viewport. */
     min-height: 0;
+    /* The one thing allowed to scroll — see .bm-shell's comment. A routed view taller than the
+       viewport (Review's queue, a long Demand/Supply result set rendered outside a Grid, etc.)
+       now scrolls in place here, under the fixed header, beside the fixed sidebar, instead of
+       scrolling the whole document. */
+    height: 100%;
+    overflow-y: auto;
 }
 
 /* ---- Dashboard view ---- */
@@ -520,4 +546,54 @@
     height: 9px;
     border-radius: 2px;
     display: inline-block;
+}
+
+/* ---- Review (demand queue + workspace), added 2026-10-05 ---- */
+
+/* Decided candidate rows (Proposed or Rejected) stay in the list rather than being removed —
+   locked-in UX decision — but fade so the reviewer's eye goes to what's still undecided. */
+.bm-candidate-row-decided {
+    opacity: 0.5;
+}
+
+.bm-candidate-row-decided:hover {
+    background: transparent;
+}
+
+/* The Review queue's Grid: one component column styled to look like the plain queue-row list
+   (card border, no header bar, no cell borders) rather than a conventional data table — see
+   ReviewQueueView's Javadoc for why this is a Grid at all (virtualized rendering + internal
+   scroll at 400+ rows) rather than the Div list Dashboard's small "needs attention" card uses. */
+.bm-review-grid {
+    border: 1px solid var(--bm-border);
+    border-radius: 10px;
+    overflow: hidden;
+    --lumo-border-radius-m: 0;
+}
+
+.bm-review-grid::part(header-row) {
+    display: none;
+}
+
+.bm-review-grid::part(row) {
+    background: #ffffff;
+}
+
+.bm-review-grid::part(cell) {
+    border: none;
+    padding: 0;
+}
+
+/* Neutral count badge (e.g. "6 undecided") — most queue rows are this, and making every single
+   one red (.bm-badge-danger) would bury the rows that actually need urgent attention
+   (EXHAUSTED/ALL DECIDED) in noise. */
+.bm-badge-neutral {
+    background: var(--bm-border-faint);
+    color: var(--bm-muted-ink);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }

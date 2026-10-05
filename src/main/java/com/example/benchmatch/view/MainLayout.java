@@ -26,10 +26,12 @@ import java.util.Objects;
  * hooks to hit this mock's exact colors/spacing, so the shell here is plain {@code Div}s/ {@code RouterLink}s styled
  * from {@code styles.css} (".bm-*" classes), the same technique the mock itself uses (plain elements, inline styles).
  * <p>
- * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Upload,
- * Shortlist. Review, Coverage Log and Admin have no view yet (no demand_review_state/coverage/admin backend), so they
- * render as the mock's disabled "navitem-static" treatment with a SOON badge. "Shortlist" has no equivalent in the mock
- * (it predates this view) — it reuses a plain custom list icon, not one from the approved design.
+ * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Review,
+ * Upload, Shortlist. Review (added 2026-10-05 — demand-side queue + workspace, backed by the
+ * demand_candidate_decisions/decision_history tables) is the first of the three former "SOON" placeholders to get a
+ * real view; Coverage Log and Admin still have none, so they render as the mock's disabled "navitem-static" treatment
+ * with a SOON badge. "Shortlist" has no equivalent in the mock (it predates this view) — it reuses a plain custom list
+ * icon, not one from the approved design.
  * <p>
  * The mock itself is a fixed light palette with a permanently-dark sidebar and no dark-mode variant of its own. A
  * dark-mode toggle existed briefly (2026-10-02/03) but was removed entirely (2026-10-03) — this shell is light-only,
@@ -122,7 +124,7 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         sidebar.add(navLink("Dashboard", ICON_DASHBOARD, DashboardView.class));
         sidebar.add(navLink("Supply", ICON_SUPPLY, SupplyView.class));
         sidebar.add(navLink("Demand", ICON_DEMAND, DemandView.class));
-        sidebar.add(soonItem("Review", ICON_REVIEW));
+        sidebar.add(navLink("Review", ICON_REVIEW, ReviewQueueView.class));
         sidebar.add(soonItem("Coverage Log", ICON_COVERAGE));
         sidebar.add(navLink("Upload", ICON_UPLOAD, UploadView.class));
         sidebar.add(navLink("Shortlist", ICON_SHORTLIST, ShortlistView.class));
