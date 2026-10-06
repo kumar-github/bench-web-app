@@ -152,7 +152,31 @@ public class DashboardView extends Div {
         return card;
     }
 
-    private Div buildQueueRow(DashboardMetrics.QueueRow row) {
+//    private Div buildQueueRow(DashboardMetrics.QueueRow row) {
+//        Div avatar = new Div(new Span(initialsOf(row.employeeName())));
+//        avatar.addClassName("bm-queue-avatar");
+//
+//        Span name = new Span(row.employeeName());
+//        name.addClassName("bm-queue-name");
+//        Span meta = new Span(" · " + row.band() + " · " + row.location());
+//        meta.addClassName("bm-queue-meta");
+//        Div nameLine = new Div(name, meta);
+//        nameLine.addClassName("bm-queue-name-line");
+//
+//        Span badge = new Span("⚠ NO STRONG/GOOD");
+//        badge.addClassName("bm-badge-danger");
+//
+//        RouterLink open = new RouterLink("Review →", SupplyView.class);
+//        open.addClassName("bm-queue-open");
+//
+//        Div queueRow = new Div(avatar, nameLine, badge, open);
+//        queueRow.addClassName("bm-queue-row");
+//        return queueRow;
+//    }
+
+    // Whole-row link, not a static row with a small nested link — matches the pattern Review's
+    // own .bm-rev-row already uses (the whole card IS the RouterLink).
+    private RouterLink buildQueueRow(DashboardMetrics.QueueRow row) {
         Div avatar = new Div(new Span(initialsOf(row.employeeName())));
         avatar.addClassName("bm-queue-avatar");
 
@@ -166,10 +190,11 @@ public class DashboardView extends Div {
         Span badge = new Span("⚠ NO STRONG/GOOD");
         badge.addClassName("bm-badge-danger");
 
-        RouterLink open = new RouterLink("Review →", SupplyView.class);
-        open.addClassName("bm-queue-open");
+        Span open = new Span("Review →");
+        open.addClassName("bm-queue-open");   // now a plain label, not its own link
 
-        Div queueRow = new Div(avatar, nameLine, badge, open);
+        RouterLink queueRow = new RouterLink(SupplyView.class);
+        queueRow.add(avatar, nameLine, badge, open);
         queueRow.addClassName("bm-queue-row");
         return queueRow;
     }

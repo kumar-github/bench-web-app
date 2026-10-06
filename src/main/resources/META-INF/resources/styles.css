@@ -52,7 +52,9 @@
 :root {
   --bm-navy: #15213b;
   --bm-navy-active: #22314f;
-  --bm-gold: #d8a54b;
+  /* --bm-gold: #d8a54b; */
+  --bm-accent: #4b5f52;
+  --bm-accent-text: #ffffff;
   --bm-ink: #1c1f26;
   --bm-muted-ink: #6b7280;
   --bm-faint-ink: #9ca3af;
@@ -67,6 +69,8 @@
   --bm-red-ink: #8b3a3a;
   --bm-red-strong: #9d5b5b;
   --bm-teal: #0f766e;
+  --bm-sage-ink-strong: #3c4f44;
+  --bm-quality-good: #c89a42;
 
   /* Card elevation, added 2026-10-06 — see file header comment. Two-layer shadow (tight
        contact shadow + barely-there ambient one), kept intentionally faint at rest so it reads
@@ -135,14 +139,16 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--bm-gold);
+  /* background: var(--bm-gold); */
+  background: var(--bm-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Manrope", sans-serif;
   font-weight: 800;
   font-size: 14px;
-  color: var(--bm-navy);
+  /* color: var(--bm-navy); */
+  color: var(--bm-accent-text);
 }
 
 .bm-brand {
@@ -283,14 +289,16 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--bm-gold);
+  /* background: var(--bm-gold); */
+  background: var(--bm-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Manrope", sans-serif;
   font-weight: 700;
   font-size: 13px;
-  color: var(--bm-navy);
+  /* color: var(--bm-navy); */
+  color: var(--bm-accent-text);
 }
 
 .bm-outlet {
@@ -338,12 +346,12 @@
 }
 
 .bm-kpi-tile-highlighted {
-  border: 2px solid var(--bm-gold);
+  border: 1.5px solid var(--bm-accent);
 }
 
 .bm-kpi-tile-highlighted .bm-kpi-value,
 .bm-kpi-tile-highlighted .bm-kpi-caption {
-  color: var(--bm-amber-ink-strong);
+  color: var(--bm-sage-ink-strong);
 }
 
 .bm-kpi-tile-muted .bm-kpi-caption {
@@ -422,8 +430,10 @@
 }
 
 .bm-pbtn {
-  background: var(--bm-gold);
-  color: var(--bm-navy);
+  /* background: var(--bm-gold); */
+  background: var(--bm-accent);
+  /* color: var(--bm-navy); */
+  color: var(--bm-accent-text);
   font-weight: 700;
   font-size: 13px;
   padding: 9px 16px;
@@ -449,10 +459,15 @@
   padding: 11px 14px;
   border-left: 3px solid var(--bm-red-strong);
   border-bottom: 1px solid var(--bm-border-faint);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: var(--bm-card-shadow);
+  transition: box-shadow 0.15s ease;
 }
 
 .bm-queue-row:hover {
-  background: var(--bm-field-bg);
+  box-shadow: var(--bm-card-shadow-hover);
 }
 
 .bm-queue-row:last-child {
@@ -552,7 +567,8 @@
 }
 
 .bm-quality-good {
-  background: var(--bm-gold);
+  /* background: var(--bm-accent); */
+  background: var(--bm-quality-good);
 }
 
 .bm-quality-weak {
@@ -725,7 +741,7 @@
 }
 
 .bm-rev-chip:hover {
-  border-color: var(--bm-gold);
+  border-color: var(--bm-accent);
 }
 
 .bm-rev-chip--active {
@@ -786,10 +802,10 @@
 }
 
 .bm-rev-row:hover {
-  background: var(--bm-field-bg);
-  border-color: #c9cdd4;
   cursor: pointer;
   box-shadow: var(--bm-card-shadow-hover);
+  /* removed: background: var(--bm-field-bg); */
+  /* removed: border-color: #c9cdd4; */
 }
 
 .bm-rev-row--overdue {
