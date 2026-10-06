@@ -1,18 +1,16 @@
-/* Add your styles here */
-
 .app-logo {
-    border-radius: min(40%, var(--vaadin-radius-m));
-    margin-inline-start: var(--vaadin-padding-inline-container);
+  border-radius: min(40%, var(--vaadin-radius-m));
+  margin-inline-start: var(--vaadin-padding-inline-container);
 }
 
 .app-name {
-    font-weight: var(--aura-font-weight-semibold);
-    font-size: var(--aura-font-size-l);
+  font-weight: var(--aura-font-weight-semibold);
+  font-size: var(--aura-font-size-l);
 }
 
 .app-footer {
-    color: var(--vaadin-text-color-secondary);
-    font-size: var(--aura-font-size-s);
+  color: var(--vaadin-text-color-secondary);
+  font-size: var(--aura-font-size-s);
 }
 
 /* ==========================================================================================
@@ -37,48 +35,67 @@
    dark-mode attempt. Fix (kept): `.bm-shell` no longer sets `color` at all — content outside
    `.bm-dash` inherits Aura's own text color — and `.bm-dash`/`.bm-header-title` set the mock's
    ink color explicitly instead of relying on inheriting it from the shell.
+
+   2026-10-06: page background/border repainted from the mock's original warm cream
+   (--bm-content-bg: #f6f4ef, --bm-border: #e6e1d6) to a cool "soft blue-gray" pair
+   (--bm-content-bg: #eef1f5, --bm-border: #dde2e8), picked after live-comparing several
+   options. Also added --bm-card-shadow/--bm-card-shadow-hover: cards previously relied on
+   their 1px border alone for definition, which read as flat grid lines rather than elevated
+   surfaces, especially once paired with the new, less contrasty border. Base shadow is applied
+   to every card-like surface (dashboard tiles/cards, the Review toolbar, Review queue rows,
+   candidate cards); the amplified hover variant is applied only where the whole element is a
+   click target (Review queue rows, candidate cards) — not on static tiles, and not on
+   EXHAUSTED review rows, which are deliberately not whole-card links (see that rule's existing
+   comment) so they keep the base shadow on hover, not the lift.
    ========================================================================================== */
 
 :root {
-    --bm-navy: #15213b;
-    --bm-navy-active: #22314f;
-    --bm-gold: #d8a54b;
-    --bm-ink: #1c1f26;
-    --bm-muted-ink: #6b7280;
-    --bm-faint-ink: #9ca3af;
-    /*--bm-border: #e6e1d6;*/
-    --bm-border: #dde2e8;
-    --bm-border-faint: #f1eee6;
-    /*--bm-content-bg: #f6f4ef;*/
-    --bm-content-bg: #eef1f5;
-    --bm-field-bg: #faf9f5;
-    --bm-amber-bg: #fdf3e3;
-    --bm-amber-ink: #6b4510;
-    --bm-amber-ink-strong: #8a5a14;
-    --bm-red-bg: #f7eaea;
-    --bm-red-ink: #8b3a3a;
-    --bm-red-strong: #9d5b5b;
-    --bm-teal: #0f766e;
+  --bm-navy: #15213b;
+  --bm-navy-active: #22314f;
+  --bm-gold: #d8a54b;
+  --bm-ink: #1c1f26;
+  --bm-muted-ink: #6b7280;
+  --bm-faint-ink: #9ca3af;
+  --bm-border: #dde2e8;
+  --bm-border-faint: #eef2f6;
+  --bm-content-bg: #eef1f5;
+  --bm-field-bg: #f8f9fb;
+  --bm-amber-bg: #fdf3e3;
+  --bm-amber-ink: #6b4510;
+  --bm-amber-ink-strong: #8a5a14;
+  --bm-red-bg: #f7eaea;
+  --bm-red-ink: #8b3a3a;
+  --bm-red-strong: #9d5b5b;
+  --bm-teal: #0f766e;
 
-    /* Review queue urgency palette — distinct from the dashboard's --bm-red-strong/--bm-amber-*
+  /* Card elevation, added 2026-10-06 — see file header comment. Two-layer shadow (tight
+       contact shadow + barely-there ambient one), kept intentionally faint at rest so it reads
+       as "lifted surface" rather than a dramatic drop shadow; the hover variant roughly doubles
+       the opacity for a clear but still restrained "this is clickable" cue. */
+  --bm-card-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 1px rgba(16, 24, 40, 0.03);
+  --bm-card-shadow-hover:
+    0 3px 8px rgba(16, 24, 40, 0.1), 0 1px 3px rgba(16, 24, 40, 0.07);
+
+  /* Review queue urgency palette — distinct from the dashboard's --bm-red-strong/--bm-amber-*
        tokens above (those are used by Dashboard's own queue rows and have different literal
        values), lifted directly from the approved Demand Review mock (Main.dc.html). */
-    --bm-rev-overdue: #b42318;
-    --bm-rev-duesoon: #b7791f;
-    --bm-rev-ontrack: #2e7d32;
-    --bm-rev-exhausted: #9aa1ab;
-    --bm-rev-cta: #1c2b45;
-    --bm-rev-cta-hover: #142033;
+  --bm-rev-overdue: #b42318;
+  --bm-rev-duesoon: #b7791f;
+  --bm-rev-ontrack: #2e7d32;
+  --bm-rev-exhausted: #9aa1ab;
+  --bm-rev-cta: #1c2b45;
+  --bm-rev-cta-hover: #142033;
 }
 
 .bm-shell {
-    display: flex;
-    font-family: 'IBM Plex Sans', sans-serif;
-    /* No `color` here on purpose — see the file header comment. Content outside `.bm-dash`
+  display: flex;
+  font-family: "IBM Plex Sans", sans-serif;
+  /* No `color` here on purpose — see the file header comment. Content outside `.bm-dash`
        (Supply/Demand/Upload/Shortlist) inherits Aura's own adaptive text color instead of a
        hardcoded ink that would stay dark even when the background goes dark. */
-    background: var(--bm-content-bg);
-    /* Pinned to the viewport (not just min-height, which MainLayout also sets inline) with
+  background: var(--bm-content-bg);
+  /* Pinned to the viewport (not just min-height, which MainLayout also sets inline) with
        overflow hidden here, so a tall ROUTED VIEW can never push the whole document taller than
        one screen. Found 2026-10-05: Review's queue (hundreds of plain-Div rows, no Grid) was the
        first view long enough to overflow .bm-shell's old unbounded height, and because the
@@ -91,170 +108,170 @@
        routed view's content gets. Supply/Demand/Shortlist already use Vaadin Grid's own internal
        virtual scroll and never relied on page-level overflow, so this was latent until Review.
     */
-    height: 100vh;
-    overflow: hidden;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ---- Sidebar ---- */
 
 .bm-sidebar {
-    width: 232px;
-    flex-shrink: 0;
-    background: var(--bm-navy);
-    display: flex;
-    flex-direction: column;
-    padding: 26px 16px;
-    box-sizing: border-box;
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--bm-navy);
+  display: flex;
+  flex-direction: column;
+  padding: 26px 16px;
+  box-sizing: border-box;
 }
 
 .bm-logo-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 2px 10px 26px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 10px 26px 10px;
 }
 
 .bm-logo-badge {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    background: var(--bm-gold);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Manrope', sans-serif;
-    font-weight: 800;
-    font-size: 14px;
-    color: var(--bm-navy);
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--bm-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--bm-navy);
 }
 
 .bm-brand {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 16px;
-    color: #ffffff;
-    letter-spacing: 0.2px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #ffffff;
+  letter-spacing: 0.2px;
 }
 
 .bm-navitem {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 2px;
-    text-decoration: none;
-    color: #c7ccda;
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  text-decoration: none;
+  color: #c7ccda;
+  cursor: pointer;
 }
 
 .bm-navitem:hover {
-    background: var(--bm-navy-active);
+  background: var(--bm-navy-active);
 }
 
 /* RouterLink's default highlight action toggles a `highlight` ATTRIBUTE (not a CSS class) —
    https://vaadin.com/api/platform/current/com/vaadin/flow/router/RouterLink.html */
 .bm-navitem[highlight] {
-    background: var(--bm-navy-active);
-    color: #ffffff;
+  background: var(--bm-navy-active);
+  color: #ffffff;
 }
 
 .bm-navitem[highlight] .bm-navlabel {
-    font-weight: 600;
-    color: #ffffff;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .bm-navitem-static {
-    opacity: 0.55;
-    cursor: default;
+  opacity: 0.55;
+  cursor: default;
 }
 
 .bm-navitem-static:hover {
-    background: transparent;
+  background: transparent;
 }
 
 .bm-navicon {
-    display: inline-flex;
-    flex-shrink: 0;
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .bm-navlabel {
-    font-size: 13.5px;
-    font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 500;
 }
 
 .bm-navlabel-flex {
-    flex: 1;
+  flex: 1;
 }
 
 .soon-badge {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #5e6b85;
-    border: 1px solid #2a3a5c;
-    border-radius: 4px;
-    padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #5e6b85;
+  border: 1px solid #2a3a5c;
+  border-radius: 4px;
+  padding: 2px 5px;
 }
 
 .bm-sidebar-spacer {
-    flex: 1;
+  flex: 1;
 }
 
 .bm-version {
-    font-size: 11px;
-    color: #5e6b85;
-    padding: 14px 12px 2px;
+  font-size: 11px;
+  color: #5e6b85;
+  padding: 14px 12px 2px;
 }
 
 /* ---- Content column + header ---- */
 
 .bm-content-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    /* Matches .bm-shell's now-fixed height — see that rule's comment. Without this, this column
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Matches .bm-shell's now-fixed height — see that rule's comment. Without this, this column
        (and .bm-outlet inside it) would still be free to grow past 100vh even though the shell
        itself is clipped, which would just move the overflow problem down one level. */
-    height: 100%;
-    min-height: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .bm-header {
-    height: 72px;
-    flex-shrink: 0;
-    background: #ffffff;
-    border-bottom: 1px solid var(--bm-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 32px;
-    box-sizing: border-box;
+  height: 72px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-bottom: 1px solid var(--bm-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  box-sizing: border-box;
 }
 
 .bm-header-title {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 20px;
-    /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment. */
-    color: var(--bm-ink);
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment. */
+  color: var(--bm-ink);
 }
 
 .bm-header-right {
-    display: flex;
-    align-items: center;
-    gap: 22px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
 }
 
 .bm-last-refreshed {
-    font-size: 12.5px;
-    color: var(--bm-muted-ink);
+  font-size: 12.5px;
+  color: var(--bm-muted-ink);
 }
 
 .bm-last-refreshed-value {
-    color: var(--bm-ink);
-    font-weight: 600;
+  color: var(--bm-ink);
+  font-weight: 600;
 }
 
 /* vaadin-text-field's <input> lives in its own shadow DOM — a light-DOM "input" selector can't
@@ -263,301 +280,303 @@
    since this field is disabled/decorative only. */
 
 .bm-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: var(--bm-gold);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--bm-navy);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bm-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--bm-navy);
 }
 
 .bm-outlet {
-    flex: 1;
-    box-sizing: border-box;
-    /* Gives .bm-dash's `min-height: 100%` below something to resolve against, so its background
+  flex: 1;
+  box-sizing: border-box;
+  /* Gives .bm-dash's `min-height: 100%` below something to resolve against, so its background
        fully covers the outlet even when the dashboard's own content is shorter than the
        viewport. */
-    min-height: 0;
-    /* The one thing allowed to scroll — see .bm-shell's comment. A routed view taller than the
+  min-height: 0;
+  /* The one thing allowed to scroll — see .bm-shell's comment. A routed view taller than the
        viewport (Review's queue, a long Demand/Supply result set rendered outside a Grid, etc.)
        now scrolls in place here, under the fixed header, beside the fixed sidebar, instead of
        scrolling the whole document. */
-    height: 100%;
-    overflow-y: auto;
+  height: 100%;
+  overflow-y: auto;
 }
 
 /* ---- Dashboard view ---- */
 
 .bm-dash {
-    padding: 28px 32px 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    box-sizing: border-box;
-    min-height: 100%;
-    /* Explicit (not inherited) so the Dashboard always shows the mock's exact light palette —
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  min-height: 100%;
+  /* Explicit (not inherited) so the Dashboard always shows the mock's exact light palette —
        see file header comment. */
-    background: var(--bm-content-bg);
-    color: var(--bm-ink);
+  background: var(--bm-content-bg);
+  color: var(--bm-ink);
 }
 
 .bm-kpi-row {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .bm-kpi-tile {
-    background: #ffffff;
-    border: 1px solid var(--bm-border);
-    border-radius: 12px;
-    padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid var(--bm-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: var(--bm-card-shadow);
 }
 
 .bm-kpi-tile-highlighted {
-    border: 2px solid var(--bm-gold);
+  border: 2px solid var(--bm-gold);
 }
 
 .bm-kpi-tile-highlighted .bm-kpi-value,
 .bm-kpi-tile-highlighted .bm-kpi-caption {
-    color: var(--bm-amber-ink-strong);
+  color: var(--bm-amber-ink-strong);
 }
 
 .bm-kpi-tile-muted .bm-kpi-caption {
-    color: var(--bm-faint-ink);
-    font-size: 11.5px;
+  color: var(--bm-faint-ink);
+  font-size: 11.5px;
 }
 
 .bm-kpi-label {
-    display: block;
-    font-size: 12.5px;
-    color: var(--bm-muted-ink);
-    font-weight: 500;
+  display: block;
+  font-size: 12.5px;
+  color: var(--bm-muted-ink);
+  font-weight: 500;
 }
 
 .bm-kpi-value {
-    display: block;
-    font-family: 'Manrope', sans-serif;
-    font-weight: 800;
-    font-size: 30px;
-    margin-top: 6px;
+  display: block;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  margin-top: 6px;
 }
 
 .bm-kpi-caption {
-    display: block;
-    font-size: 12px;
-    color: var(--bm-muted-ink);
-    margin-top: 4px;
+  display: block;
+  font-size: 12px;
+  color: var(--bm-muted-ink);
+  margin-top: 4px;
 }
 
 .bm-kpi-caption-teal {
-    color: var(--bm-teal);
+  color: var(--bm-teal);
 }
 
 .bm-dash-middle-row {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 18px;
-    align-items: start;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+  align-items: start;
 }
 
 .bm-card {
-    background: #ffffff;
-    border: 1px solid var(--bm-border);
-    border-radius: 14px;
-    padding: 22px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid var(--bm-border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+  box-shadow: var(--bm-card-shadow);
 }
 
 /* "Your queue"-style header: big Manrope title, used only for the needs-attention card. */
 .bm-card-title-lg {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 16px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
 }
 
 /* Plain small card header, used for every other card (match quality, etc). */
 .bm-card-title {
-    font-weight: 600;
-    font-size: 13px;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .bm-card-subtitle {
-    font-size: 12px;
-    color: var(--bm-faint-ink);
-    margin-top: 2px;
+  font-size: 12px;
+  color: var(--bm-faint-ink);
+  margin-top: 2px;
 }
 
 .bm-queue-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .bm-pbtn {
-    background: var(--bm-gold);
-    color: var(--bm-navy);
-    font-weight: 700;
-    font-size: 13px;
-    padding: 9px 16px;
-    border-radius: 8px;
-    font-family: 'Manrope', sans-serif;
-    text-decoration: none;
+  background: var(--bm-gold);
+  color: var(--bm-navy);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-family: "Manrope", sans-serif;
+  text-decoration: none;
 }
 
 .bm-pbtn:hover {
-    opacity: 0.9;
+  opacity: 0.9;
 }
 
 .bm-queue-rows {
-    border: 1px solid var(--bm-border);
-    border-radius: 10px;
-    overflow: hidden;
+  border: 1px solid var(--bm-border);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .bm-queue-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 11px 14px;
-    border-left: 3px solid var(--bm-red-strong);
-    border-bottom: 1px solid var(--bm-border-faint);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-left: 3px solid var(--bm-red-strong);
+  border-bottom: 1px solid var(--bm-border-faint);
 }
 
 .bm-queue-row:hover {
-    background: var(--bm-field-bg);
+  background: var(--bm-field-bg);
 }
 
 .bm-queue-row:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .bm-queue-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: var(--bm-border-faint);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 11px;
-    flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bm-border-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .bm-queue-name-line {
-    flex: 1;
-    min-width: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .bm-queue-name {
-    font-size: 13px;
-    font-weight: 600;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .bm-queue-meta {
-    font-weight: 500;
-    color: var(--bm-faint-ink);
-    font-size: 11.5px;
+  font-weight: 500;
+  color: var(--bm-faint-ink);
+  font-size: 11.5px;
 }
 
 .bm-badge-danger {
-    background: var(--bm-red-bg);
-    color: var(--bm-red-ink);
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 5px;
-    flex-shrink: 0;
-    white-space: nowrap;
+  background: var(--bm-red-bg);
+  color: var(--bm-red-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .bm-queue-open {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--bm-navy);
-    flex-shrink: 0;
-    text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bm-navy);
+  flex-shrink: 0;
+  text-decoration: none;
 }
 
 .bm-queue-more {
-    font-size: 11.5px;
-    color: var(--bm-faint-ink);
-    text-align: center;
+  font-size: 11.5px;
+  color: var(--bm-faint-ink);
+  text-align: center;
 }
 
 .bm-queue-reconciliation {
-    font-size: 11px;
-    color: #b8bcc6;
-    text-align: center;
-    border-top: 1px solid var(--bm-border-faint);
-    padding-top: 8px;
+  font-size: 11px;
+  color: #b8bcc6;
+  text-align: center;
+  border-top: 1px solid var(--bm-border-faint);
+  padding-top: 8px;
 }
 
 .bm-quality-bar {
-    display: flex;
-    height: 14px;
-    border-radius: 7px;
-    overflow: hidden;
-    background: var(--bm-border-faint);
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bm-border-faint);
 }
 
 .bm-quality-bar-empty {
-    height: auto;
-    min-height: 14px;
-    align-items: center;
-    justify-content: center;
-    padding: 3px 0;
+  height: auto;
+  min-height: 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 0;
 }
 
 .bm-quality-bar-empty-label {
-    font-size: 11px;
-    color: var(--bm-faint-ink);
+  font-size: 11px;
+  color: var(--bm-faint-ink);
 }
 
 .bm-quality-segment {
-    height: 100%;
+  height: 100%;
 }
 
 .bm-quality-strong {
-    background: var(--bm-teal);
+  background: var(--bm-teal);
 }
 
 .bm-quality-good {
-    background: var(--bm-gold);
+  background: var(--bm-gold);
 }
 
 .bm-quality-weak {
-    background: var(--bm-red-strong);
+  background: var(--bm-red-strong);
 }
 
 .bm-quality-legend {
-    display: flex;
-    gap: 18px;
+  display: flex;
+  gap: 18px;
 }
 
 .bm-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
 }
 
 .bm-legend-swatch {
-    width: 9px;
-    height: 9px;
-    border-radius: 2px;
-    display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
 }
 
 /* ---- Review (demand queue + workspace), added 2026-10-05 ---- */
@@ -565,11 +584,11 @@
 /* Decided candidate rows (Proposed or Rejected) stay in the list rather than being removed —
    locked-in UX decision — but fade so the reviewer's eye goes to what's still undecided. */
 .bm-candidate-row-decided {
-    opacity: 0.5;
+  opacity: 0.5;
 }
 
 .bm-candidate-row-decided:hover {
-    background: transparent;
+  background: transparent;
 }
 
 /* ---- Review queue (landing page), rebuilt 2026-10-05 to match Main.dc.html pixel-for-pixel ----
@@ -580,81 +599,82 @@
    DemandReviewService.queue()'s own Javadoc already gives for staying a plain List). */
 
 .bm-rev-header {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .bm-rev-stats {
-    display: flex;
-    align-items: baseline;
-    gap: 18px;
-    flex-wrap: wrap;
-    font-size: 14px;
-    color: var(--bm-muted-ink);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--bm-muted-ink);
 }
 
 .bm-rev-stats strong {
-    font-size: 15px;
-    color: var(--bm-ink);
+  font-size: 15px;
+  color: var(--bm-ink);
 }
 
 .bm-rev-stat-overdue {
-    color: var(--bm-rev-overdue);
-    font-weight: 600;
+  color: var(--bm-rev-overdue);
+  font-weight: 600;
 }
 
 .bm-rev-stat-duesoon {
-    color: var(--bm-rev-duesoon);
-    font-weight: 600;
+  color: var(--bm-rev-duesoon);
+  font-weight: 600;
 }
 
 .bm-rev-stat-nocoverage {
-    color: var(--bm-rev-cta);
-    font-weight: 600;
+  color: var(--bm-rev-cta);
+  font-weight: 600;
 }
 
 .bm-rev-stat-flagged {
-    color: var(--bm-muted-ink);
-    font-weight: 600;
+  color: var(--bm-muted-ink);
+  font-weight: 600;
 }
 
 .bm-rev-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    background: #ffffff;
-    border: 1px solid var(--bm-border);
-    border-radius: 10px;
-    padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid var(--bm-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: var(--bm-card-shadow);
 }
 
 .bm-rev-search {
-    flex: 1 1 260px;
-    min-width: 220px;
+  flex: 1 1 260px;
+  min-width: 220px;
 }
 
 .bm-rev-search input {
-    background: var(--bm-content-bg);
+  background: var(--bm-content-bg);
 }
 
 .bm-rev-flagged-filter {
-    font-size: 13px;
-    color: var(--bm-muted-ink);
-    flex-shrink: 0;
-    white-space: nowrap;
+  font-size: 13px;
+  color: var(--bm-muted-ink);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Carries forward onto a demand that re-enters OPEN after being flagged while EXHAUSTED — see
    ReviewQueueView.buildRow()'s comment on why this badge isn't only in the EXHAUSTED branch. */
 .bm-rev-flagged-badge {
-    display: inline-block;
-    margin-top: 4px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--bm-muted-ink);
-    white-space: nowrap;
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--bm-muted-ink);
+  white-space: nowrap;
 }
 
 /* Filter chips (Persona/Band/Location) + sort dropdown — added 2026-10-06. The approved mock
@@ -663,341 +683,350 @@
    mock called for. One chip group per dimension, multi-select within a group (OR), AND across
    groups — same combinability as the existing search box + "Flagged for hiring only" checkbox. */
 .bm-rev-filterbar {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .bm-rev-chip-groups {
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
 .bm-rev-chip-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .bm-rev-chip-group-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--bm-faint-ink);
-    margin-right: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bm-faint-ink);
+  margin-right: 2px;
 }
 
 .bm-rev-chip {
-    font-size: 12.5px;
-    padding: 4px 11px;
-    border-radius: 999px;
-    border: 1px solid var(--bm-border);
-    background: #ffffff;
-    color: var(--bm-muted-ink);
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
+  font-size: 12.5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--bm-border);
+  background: #ffffff;
+  color: var(--bm-muted-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .bm-rev-chip:hover {
-    border-color: var(--bm-gold);
+  border-color: var(--bm-gold);
 }
 
 .bm-rev-chip--active {
-    background: var(--bm-navy);
-    border-color: var(--bm-navy);
-    color: #ffffff;
-    font-weight: 600;
+  background: var(--bm-navy);
+  border-color: var(--bm-navy);
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .bm-rev-sort {
-    flex-shrink: 0;
-    min-width: 190px;
+  flex-shrink: 0;
+  min-width: 190px;
 }
 
 .bm-rev-legend {
-    display: flex;
-    gap: 18px;
-    font-size: 12px;
-    color: var(--bm-muted-ink);
-    padding: 0 4px;
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--bm-muted-ink);
+  padding: 0 4px;
 }
 
 .bm-rev-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bm-rev-legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .bm-rev-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .bm-rev-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: #ffffff;
-    border: 1px solid var(--bm-border);
-    border-left: 4px solid var(--bm-rev-ontrack);
-    border-radius: 10px;
-    padding: 16px 18px;
-    text-decoration: none;
-    color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid var(--bm-border);
+  border-left: 4px solid var(--bm-rev-ontrack);
+  border-radius: 10px;
+  padding: 16px 18px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--bm-card-shadow);
+  transition:
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .bm-rev-row:hover {
-    background: var(--bm-field-bg);
-    border-color: #c9cdd4;
-    cursor: pointer;
+  background: var(--bm-field-bg);
+  border-color: #c9cdd4;
+  cursor: pointer;
+  box-shadow: var(--bm-card-shadow-hover);
 }
 
 .bm-rev-row--overdue {
-    border-left-color: var(--bm-rev-overdue);
+  border-left-color: var(--bm-rev-overdue);
 }
 
 .bm-rev-row--duesoon {
-    border-left-color: var(--bm-rev-duesoon);
+  border-left-color: var(--bm-rev-duesoon);
 }
 
 .bm-rev-row--exhausted {
-    background: #fbf9f4;
-    border-color: #ede4cc;
-    border-left-color: var(--bm-rev-exhausted);
+  background: #fbf9f4;
+  border-color: #ede4cc;
+  border-left-color: var(--bm-rev-exhausted);
 }
 
 .bm-rev-row--exhausted:hover {
-    background: #f6f1e6;
-    /* Not a link (see ReviewQueueView.buildRow()'s comment) — only its two actions are
-       clickable, so the whole-card pointer cursor .bm-rev-row:hover sets would be misleading. */
-    cursor: default;
+  background: #f6f1e6;
+  /* Not a link (see ReviewQueueView.buildRow()'s comment) — only its two actions are
+       clickable, so the whole-card pointer cursor .bm-rev-row:hover sets would be misleading.
+       Same reasoning extends to the shadow: no hover lift here, since the row itself isn't the
+       click target — stays at the base shadow. */
+  cursor: default;
+  box-shadow: var(--bm-card-shadow);
 }
 
 .bm-rev-urgency {
-    min-width: 150px;
-    flex-shrink: 0;
+  min-width: 150px;
+  flex-shrink: 0;
 }
 
 .bm-rev-urgency-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .3px;
-    margin-bottom: 4px;
-    color: var(--bm-rev-ontrack);
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+  color: var(--bm-rev-ontrack);
 }
 
 .bm-rev-urgency-label--overdue {
-    color: var(--bm-rev-overdue);
+  color: var(--bm-rev-overdue);
 }
 
 .bm-rev-urgency-label--duesoon {
-    color: var(--bm-rev-duesoon);
+  color: var(--bm-rev-duesoon);
 }
 
 .bm-rev-urgency-label--exhausted {
-    color: var(--bm-muted-ink);
+  color: var(--bm-muted-ink);
 }
 
 .bm-rev-id {
-    display: block;
-    font-size: 15px;
-    font-weight: 650;
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .bm-rev-info {
-    flex: 1 1 260px;
-    min-width: 220px;
+  flex: 1 1 260px;
+  min-width: 220px;
 }
 
 .bm-rev-title {
-    display: block;
-    font-size: 13.5px;
-    font-weight: 600;
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 .bm-rev-sub {
-    display: block;
-    font-size: 12.5px;
-    color: var(--bm-muted-ink);
-    margin-top: 2px;
+  display: block;
+  font-size: 12.5px;
+  color: var(--bm-muted-ink);
+  margin-top: 2px;
 }
 
 .bm-rev-positions {
-    min-width: 120px;
-    text-align: center;
-    flex-shrink: 0;
+  min-width: 120px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .bm-rev-positions-main {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .bm-rev-positions-sub {
-    display: block;
-    font-size: 12px;
-    color: var(--bm-muted-ink);
+  display: block;
+  font-size: 12px;
+  color: var(--bm-muted-ink);
 }
 
 .bm-rev-positions-sub--warn {
-    color: var(--bm-rev-duesoon);
+  color: var(--bm-rev-duesoon);
 }
 
 .bm-rev-pills {
-    min-width: 170px;
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
+  min-width: 170px;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .bm-rev-pill {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 9px;
-    border-radius: 6px;
-    white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .bm-rev-pill-strong {
-    background: #e8f3ec;
-    color: #1e7a3c;
+  background: #e8f3ec;
+  color: #1e7a3c;
 }
 
 .bm-rev-pill-good {
-    background: #fef3dc;
-    color: #9a6b12;
+  background: #fef3dc;
+  color: #9a6b12;
 }
 
 .bm-rev-pill-zero {
-    background: #f1f2f4;
-    color: #8a919c;
+  background: #f1f2f4;
+  color: #8a919c;
 }
 
 .bm-rev-cta {
-    margin-left: auto;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--bm-rev-cta);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bm-rev-cta);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .bm-rev-cta--muted {
-    color: var(--bm-muted-ink);
+  color: var(--bm-muted-ink);
 }
 
 /* EXHAUSTED rows' two distinct actions ("View" + "Flag for hiring") — see ReviewQueueView.
    buildExhaustedActions()'s comment for why this isn't the same whole-row-link pattern the other
    rows use. */
 .bm-rev-exhausted-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .bm-rev-flag-btn {
-    font-size: 12.5px;
-    font-weight: 600;
-    padding: 6px 12px;
-    border-radius: 7px;
-    border: 1px solid var(--bm-rev-cta);
-    color: var(--bm-rev-cta);
-    background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--bm-rev-cta);
+  color: var(--bm-rev-cta);
+  background: #ffffff;
 }
 
 .bm-rev-flag-btn:hover:not(:disabled) {
-    background: var(--bm-rev-cta);
-    color: #ffffff;
+  background: var(--bm-rev-cta);
+  color: #ffffff;
 }
 
 .bm-rev-flag-btn--done,
 .bm-rev-flag-btn--done:hover {
-    border-color: #d7dbe0;
-    color: var(--bm-muted-ink);
-    background: #f1f2f4;
-    cursor: default;
+  border-color: #d7dbe0;
+  color: var(--bm-muted-ink);
+  background: #f1f2f4;
+  cursor: default;
 }
 
 .bm-rev-note {
-    font-size: 12.5px;
-    color: #8a919c;
-    padding: 2px 4px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  font-size: 12.5px;
+  color: #8a919c;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bm-rev-note-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--bm-rev-exhausted);
-    display: inline-block;
-    flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bm-rev-exhausted);
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .bm-rev-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
 }
 
 .bm-rev-pagination-caption {
-    font-size: 12.5px;
-    color: #8a919c;
+  font-size: 12.5px;
+  color: #8a919c;
 }
 
 .bm-rev-pagination-pages {
-    display: flex;
-    gap: 6px;
+  display: flex;
+  gap: 6px;
 }
 
 .bm-rev-page-btn {
-    font-size: 13px;
-    padding: 6px 11px;
-    border-radius: 7px;
-    border: 1px solid #d7dbe0;
-    color: var(--bm-muted-ink);
-    background: #ffffff;
-    cursor: pointer;
-    min-width: 34px;
+  font-size: 13px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid #d7dbe0;
+  color: var(--bm-muted-ink);
+  background: #ffffff;
+  cursor: pointer;
+  min-width: 34px;
 }
 
 .bm-rev-page-btn:hover:not(:disabled) {
-    background: var(--bm-field-bg);
+  background: var(--bm-field-bg);
 }
 
 .bm-rev-page-btn:disabled {
-    color: #c9cdd4;
-    cursor: default;
+  color: #c9cdd4;
+  cursor: default;
 }
 
 .bm-rev-page-btn--active {
-    background: var(--bm-rev-cta);
-    color: #ffffff;
-    font-weight: 600;
-    border-color: var(--bm-rev-cta);
+  background: var(--bm-rev-cta);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: var(--bm-rev-cta);
 }
 
 /* ---- Demand Workspace candidate cards — "two states, four dimensions" rebuild, 2026-10-06.
@@ -1005,98 +1034,104 @@
    this does not touch) with per-candidate cards carrying four dimension rows each. ---- */
 
 .bm-cand-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .bm-cand-card {
-    border: 1px solid var(--bm-border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  border: 1px solid var(--bm-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--bm-card-shadow);
+  transition: box-shadow 0.15s ease;
+}
+
+.bm-cand-card:hover {
+  box-shadow: var(--bm-card-shadow-hover);
 }
 
 .bm-cand-card-override {
-    border-color: var(--bm-rev-duesoon);
-    background: var(--bm-amber-bg);
+  border-color: var(--bm-rev-duesoon);
+  background: var(--bm-amber-bg);
 }
 
 .bm-cand-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .bm-cand-tier-badge {
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 5px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    letter-spacing: 0.02em;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .bm-cand-tier-strong {
-    background: #e6f4ea;
-    color: var(--bm-rev-ontrack);
+  background: #e6f4ea;
+  color: var(--bm-rev-ontrack);
 }
 
 .bm-cand-tier-good {
-    background: var(--bm-amber-bg);
-    color: var(--bm-amber-ink-strong);
+  background: var(--bm-amber-bg);
+  color: var(--bm-amber-ink-strong);
 }
 
 .bm-cand-tier-weak {
-    background: var(--bm-border-faint);
-    color: var(--bm-muted-ink);
+  background: var(--bm-border-faint);
+  color: var(--bm-muted-ink);
 }
 
 .bm-cand-tier-override {
-    background: var(--bm-rev-duesoon);
-    color: #ffffff;
+  background: var(--bm-rev-duesoon);
+  color: #ffffff;
 }
 
 .bm-cand-dims {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-left: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 42px;
 }
 
 .bm-cand-dim-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
 }
 
 .bm-cand-dim-label {
-    display: block;
-    font-weight: 700;
-    color: var(--bm-muted-ink);
-    min-width: 72px;
+  display: block;
+  font-weight: 700;
+  color: var(--bm-muted-ink);
+  min-width: 72px;
 }
 
 .bm-cand-dim-collapsed {
-    display: block;
-    color: var(--bm-ink);
+  display: block;
+  color: var(--bm-ink);
 }
 
 .bm-cand-dim-expanded {
-    display: block;
-    color: var(--bm-faint-ink);
-    font-style: italic;
+  display: block;
+  color: var(--bm-faint-ink);
+  font-style: italic;
 }
 
 .bm-override-section {
-    border: 1px dashed var(--bm-rev-duesoon);
+  border: 1px dashed var(--bm-rev-duesoon);
 }
 
 .bm-override-btn {
-    background: var(--bm-rev-duesoon);
-    color: #ffffff;
+  background: var(--bm-rev-duesoon);
+  color: #ffffff;
 }
