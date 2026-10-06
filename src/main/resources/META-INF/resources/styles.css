@@ -46,9 +46,11 @@
     --bm-ink: #1c1f26;
     --bm-muted-ink: #6b7280;
     --bm-faint-ink: #9ca3af;
-    --bm-border: #e6e1d6;
+    /*--bm-border: #e6e1d6;*/
+    --bm-border: #dde2e8;
     --bm-border-faint: #f1eee6;
-    --bm-content-bg: #f6f4ef;
+    /*--bm-content-bg: #f6f4ef;*/
+    --bm-content-bg: #eef1f5;
     --bm-field-bg: #faf9f5;
     --bm-amber-bg: #fdf3e3;
     --bm-amber-ink: #6b4510;
