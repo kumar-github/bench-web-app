@@ -23,6 +23,14 @@ public class DemandCandidateDecision {
     public static final String STATUS_APPROVED = "approved";
     public static final String STATUS_REJECTED = "rejected";
     public static final String STATUS_STAFFED = "staffed";
+    /**
+     * The "Override" action (requirements doc's Review interaction model) — deliberately distinct
+     * from {@link #STATUS_APPROVED} so it's never mistaken for an ordinary Propose. Only valid for
+     * a candidate whose engine tier at decision time was "Excluded" for being exactly one sub-band
+     * below the demand's band (see MatchingService.bandSignal()'s "below_one" quality and
+     * DemandReviewService's OVERRIDE_ELIGIBLE_BAND_QUALITY) — added by V11__override_decision_status.sql.
+     */
+    public static final String STATUS_OVERRIDDEN = "overridden";
 
     // SERIAL in the schema (32-bit), not BIGSERIAL — Integer here, not Long, to match. decision_history.decision_id
     // (which FKs this) is declared INTEGER for the same reason.

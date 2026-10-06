@@ -655,6 +655,69 @@
     white-space: nowrap;
 }
 
+/* Filter chips (Persona/Band/Location) + sort dropdown — added 2026-10-06. The approved mock
+   (Main.dc.html) showed these as static decoration with no filtering/sorting behind them; this
+   wires them to the real queue data instead of either faking a result or dropping the row the
+   mock called for. One chip group per dimension, multi-select within a group (OR), AND across
+   groups — same combinability as the existing search box + "Flagged for hiring only" checkbox. */
+.bm-rev-filterbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.bm-rev-chip-groups {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.bm-rev-chip-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.bm-rev-chip-group-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bm-faint-ink);
+    margin-right: 2px;
+}
+
+.bm-rev-chip {
+    font-size: 12.5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--bm-border);
+    background: #ffffff;
+    color: var(--bm-muted-ink);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.bm-rev-chip:hover {
+    border-color: var(--bm-gold);
+}
+
+.bm-rev-chip--active {
+    background: var(--bm-navy);
+    border-color: var(--bm-navy);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.bm-rev-sort {
+    flex-shrink: 0;
+    min-width: 190px;
+}
+
 .bm-rev-legend {
     display: flex;
     gap: 18px;
@@ -933,4 +996,105 @@
     color: #ffffff;
     font-weight: 600;
     border-color: var(--bm-rev-cta);
+}
+
+/* ---- Demand Workspace candidate cards — "two states, four dimensions" rebuild, 2026-10-06.
+   Replaces the flat .bm-queue-row candidate rows (kept for the Review QUEUE's own rows, which
+   this does not touch) with per-candidate cards carrying four dimension rows each. ---- */
+
+.bm-cand-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bm-cand-card {
+    border: 1px solid var(--bm-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bm-cand-card-override {
+    border-color: var(--bm-rev-duesoon);
+    background: var(--bm-amber-bg);
+}
+
+.bm-cand-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.bm-cand-tier-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.bm-cand-tier-strong {
+    background: #e6f4ea;
+    color: var(--bm-rev-ontrack);
+}
+
+.bm-cand-tier-good {
+    background: var(--bm-amber-bg);
+    color: var(--bm-amber-ink-strong);
+}
+
+.bm-cand-tier-weak {
+    background: var(--bm-border-faint);
+    color: var(--bm-muted-ink);
+}
+
+.bm-cand-tier-override {
+    background: var(--bm-rev-duesoon);
+    color: #ffffff;
+}
+
+.bm-cand-dims {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 42px;
+}
+
+.bm-cand-dim-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.bm-cand-dim-label {
+    display: block;
+    font-weight: 700;
+    color: var(--bm-muted-ink);
+    min-width: 72px;
+}
+
+.bm-cand-dim-collapsed {
+    display: block;
+    color: var(--bm-ink);
+}
+
+.bm-cand-dim-expanded {
+    display: block;
+    color: var(--bm-faint-ink);
+    font-style: italic;
+}
+
+.bm-override-section {
+    border: 1px dashed var(--bm-rev-duesoon);
+}
+
+.bm-override-btn {
+    background: var(--bm-rev-duesoon);
+    color: #ffffff;
 }

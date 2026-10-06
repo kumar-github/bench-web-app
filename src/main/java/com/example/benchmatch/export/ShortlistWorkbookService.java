@@ -587,9 +587,12 @@ public class ShortlistWorkbookService {
      * groups by tier but does not itself sort each tier by ageing_rank/demandId the way the workbook wants.
      */
     private List<ShortlistRow> capAndSort(List<ShortlistRow> rows) {
+        // bandOverrideEligible is always false here — the Excel export's capping behavior is
+        // unchanged by the web app's Override feature; only DemandReviewService's review
+        // workspace carves out that separate bucket (see MatchingService.isOneBandBelow()).
         List<MatchRow> matchRows = rows.stream()
                 .map(r -> new MatchRow(r.employeeId(), r.demandId(), r.overallTier(), r.skillQuality(),
-                        r.ageingRank(), r.balancePositions(), r.oneLiner(), null, null, null))
+                        r.ageingRank(), r.balancePositions(), r.oneLiner(), null, null, null, false))
                 .toList();
         List<MatchRow> capped = matchingService.capEmployeeRows(matchRows);
         Set<String> keptDemandIds = capped.stream().map(MatchRow::demandId).collect(Collectors.toCollection(HashSet::new));

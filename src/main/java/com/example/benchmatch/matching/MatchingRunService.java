@@ -110,11 +110,12 @@ public class MatchingRunService {
 
                     String oneLiner = buildOneLiner(skill, band, location, assessment);
                     int ageingRank = matchingService.ageingRank(dem.getDueCategory());
+                    boolean bandOverrideEligible = matchingService.isOneBandBelow(emp.getSubBand(), dem.getBand());
 
                     empRows.add(new MatchRow(
                             emp.getEmployeeId(), dem.getDemandId(), tier, skill.quality(),
                             ageingRank, dem.getBalancePositions(), oneLiner,
-                            skill.quality(), band.quality(), location.quality()
+                            skill.quality(), band.quality(), location.quality(), bandOverrideEligible
                     ));
                 }
                 if (empRows.isEmpty()) {

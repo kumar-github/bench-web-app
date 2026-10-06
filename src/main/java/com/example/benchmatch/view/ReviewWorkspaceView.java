@@ -18,9 +18,11 @@ import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Demand Workspace — the per-demand decision screen opened from {@link ReviewQueueView}. Shows
@@ -55,6 +57,21 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
      */
     private String fromPage;
 
+    /**
+     * Per-card expand state ("two states, four dimensions" — collapsed by default, expanded on
+     * click), independent of {@link #expandAll}. Keyed by employeeId since a workspace only ever
+     * shows one demand's candidates at a time.
+     */
+    private final Set<Long> expandedEmployeeIds = new HashSet<>();
+
+    /**
+     * The global "expand all" toggle from the requirements doc's "Card expand trigger" decision —
+     * "both mechanisms, not one or the other" — for the audit case where a reviewer wants every
+     * raw value in front of them at once. ORed with expandedEmployeeIds per-card, so toggling it
+     * off doesn't lose individually-expanded cards.
+     */
+    private boolean expandAll;
+
     public ReviewWorkspaceView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
         addClassName("bm-dash");
@@ -78,9 +95,26 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
 
         add(buildBackLink());
         add(buildDemandHeader(workspace));
+        add(buildExpandAllToggle());
         add(buildCandidateSection("Strong", workspace, "Strong"));
         add(buildCandidateSection("Good", workspace, "Good"));
         add(buildCandidateSection("Weak", workspace, "Weak"));
+        add(buildOverrideSection(workspace));
+    }
+
+    /**
+     * "Both mechanisms, not one or the other" (requirements doc) — this sits alongside, not
+     * instead of, each card's own click-to-expand.
+     */
+    private Div buildExpandAllToggle() {
+        Button toggle = new Button(expandAll ? "Collapse all" : "Expand all", e -> {
+            expandAll = !expandAll;
+            render();
+        });
+        toggle.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+        Div bar = new Div(toggle);
+        bar.getStyle().set("display", "flex").set("justify-content", "flex-end");
+        return bar;
     }
 
     private RouterLink buildBackLink() {
@@ -116,16 +150,16 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     }
 
     private Div buildCandidateSection(String heading, ReviewWorkspaceDto w, String tier) {
-        java.util.List<ReviewCandidateDto> inTier = w.candidates().stream()
+        List<ReviewCandidateDto> inTier = w.candidates().stream()
                 .filter(c -> tier.equals(c.overallTier())).toList();
 
         Span title = new Span(heading + " (" + inTier.size() + ")");
         title.addClassName("bm-card-title");
 
         Div rows = new Div();
-        rows.addClassName("bm-queue-rows");
+        rows.addClassName("bm-cand-list");
         for (ReviewCandidateDto c : inTier) {
-            rows.add(buildCandidateRow(c));
+            rows.add(buildCandidateCard(c, false));
         }
         if (inTier.isEmpty()) {
             Span empty = new Span("No " + heading.toLowerCase(Locale.ROOT) + " candidates.");
@@ -138,28 +172,104 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
         return card;
     }
 
-    private Div buildCandidateRow(ReviewCandidateDto c) {
+    /**
+     * The one-sub-band-below Override-eligible bucket — see ReviewCandidateDto.overrideEligible()'s
+     * Javadoc. A separate section, never mixed into Strong/Good/Weak, so Override is never mistaken
+     * for an ordinary Propose (same reasoning the requirements doc gives for keeping the action
+     * itself distinct). Omitted entirely when there's nothing in it, rather than an always-present
+     * "(0)" section — unlike Strong/Good/Weak, which are always one of the demand's three defined
+     * tiers, this bucket is the exception case, not a default empty state worth showing.
+     */
+    private Div buildOverrideSection(ReviewWorkspaceDto w) {
+        List<ReviewCandidateDto> eligible = w.candidates().stream()
+                .filter(ReviewCandidateDto::overrideEligible).toList();
+        if (eligible.isEmpty()) {
+            return new Div();
+        }
+
+        Span title = new Span("Override-eligible — one band below the ask (" + eligible.size() + ")");
+        title.addClassName("bm-card-title");
+        Span subtitle = new Span("Excluded by the engine's band rule, but close enough that a reviewer may "
+                + "deliberately choose to propose anyway. Use Override, not Propose, so this is never read "
+                + "back as an ordinary approval.");
+        subtitle.addClassName("bm-card-subtitle");
+
+        Div rows = new Div();
+        rows.addClassName("bm-cand-list");
+        for (ReviewCandidateDto c : eligible) {
+            rows.add(buildCandidateCard(c, true));
+        }
+
+        Div card = new Div(title, subtitle, rows);
+        card.addClassName("bm-card");
+        card.addClassName("bm-override-section");
+        return card;
+    }
+
+    /**
+     * One "two states, four dimensions" card. Collapsed by default: overall tier/one-liner plus
+     * four dimension rows showing ONLY the plain-English Collapsed text. Expanded (per-card click,
+     * or the global "expand all" toggle): the same four rows also show their raw-value Expanded
+     * text. All four dimensions expand together, never independently, per the requirements doc.
+     */
+    private Div buildCandidateCard(ReviewCandidateDto c, boolean isOverride) {
+        boolean expanded = expandAll || expandedEmployeeIds.contains(c.employeeId());
+
         Div avatar = new Div(new Span(initialsOf(c.employeeName())));
         avatar.addClassName("bm-queue-avatar");
 
         Span name = new Span(c.employeeName() + "  (#" + c.employeeId() + ")");
         name.addClassName("bm-queue-name");
-        Span meta = new Span(nz(c.band()) + " / " + nz(c.subBand()) + "  ·  " + nz(c.location())
-                + "  ·  Bench " + (c.benchAgeingDays() == null ? "—" : c.benchAgeingDays() + "d")
-                + "  ·  " + nz(c.oneLiner()));
-        meta.addClassName("bm-queue-meta");
-        Div nameLine = new Div(name, meta);
+        Span oneLiner = new Span(nz(c.oneLiner()));
+        oneLiner.addClassName("bm-queue-meta");
+        Div nameLine = new Div(name, oneLiner);
         nameLine.addClassName("bm-queue-name-line");
+        nameLine.getStyle().set("cursor", "pointer");
+        nameLine.addClickListener(e -> {
+            if (expandedEmployeeIds.contains(c.employeeId())) {
+                expandedEmployeeIds.remove(c.employeeId());
+            } else {
+                expandedEmployeeIds.add(c.employeeId());
+            }
+            render();
+        });
 
-        Div row = new Div(avatar, nameLine);
-        row.addClassName("bm-queue-row");
+        Span tierBadge = new Span(isOverride ? "ONE BAND BELOW" : c.overallTier().toUpperCase(Locale.ROOT));
+        tierBadge.addClassName("bm-cand-tier-badge");
+        tierBadge.addClassName(isOverride ? "bm-cand-tier-override" : "bm-cand-tier-" + c.overallTier().toLowerCase(Locale.ROOT));
+
+        Div header = new Div(avatar, nameLine, tierBadge);
+        header.addClassName("bm-cand-header");
+
+        Div dims = new Div(
+                buildDimensionRow("Skill", c.skillCollapsed(), c.skillExpanded(), expanded),
+                buildDimensionRow("Band", c.bandCollapsed(), c.bandExpanded(), expanded),
+                buildDimensionRow("Location", c.locationCollapsed(), c.locationExpanded(), expanded),
+                buildDimensionRow("Assessment", c.assessmentCollapsed(), c.assessmentExpanded(), expanded)
+        );
+        dims.addClassName("bm-cand-dims");
+
+        Div card = new Div(header, dims);
+        card.addClassName("bm-cand-card");
+        if (isOverride) {
+            card.addClassName("bm-cand-card-override");
+        }
 
         if (c.isDecided()) {
-            row.addClassName("bm-candidate-row-decided");
+            card.addClassName("bm-candidate-row-decided");
             Span status = new Span(c.decisionStatus().toUpperCase(Locale.ROOT)
                     + (c.decidedByName() == null ? "" : " · " + c.decidedByName()));
             status.addClassName("bm-badge-danger");
-            row.add(status);
+            card.add(status);
+        } else if (isOverride) {
+            Button override = new Button("Override", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_OVERRIDDEN));
+            override.addThemeVariants(ButtonVariant.LUMO_SMALL);
+            override.addClassName("bm-override-btn");
+            Button reject = new Button("Reject", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_REJECTED));
+            reject.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            Div actions = new Div(override, reject);
+            actions.getStyle().set("display", "flex").set("gap", "8px").set("flex-shrink", "0");
+            card.add(actions);
         } else {
             Button propose = new Button("Propose", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_APPROVED));
             propose.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
@@ -167,9 +277,29 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
             reject.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
             Div actions = new Div(propose, reject);
             actions.getStyle().set("display", "flex").set("gap", "8px").set("flex-shrink", "0");
-            row.add(actions);
+            card.add(actions);
         }
 
+        return card;
+    }
+
+    /**
+     * One dimension row. Collapsed text always shows; Expanded text (the raw values) is appended
+     * only when {@code expanded} is true — never shown alone, per the card spec.
+     */
+    private Div buildDimensionRow(String label, String collapsed, String expandedText, boolean expanded) {
+        Span labelSpan = new Span(label);
+        labelSpan.addClassName("bm-cand-dim-label");
+        Span collapsedSpan = new Span(nz(collapsed));
+        collapsedSpan.addClassName("bm-cand-dim-collapsed");
+
+        Div row = new Div(labelSpan, collapsedSpan);
+        row.addClassName("bm-cand-dim-row");
+        if (expanded && expandedText != null && !expandedText.isBlank()) {
+            Span expandedSpan = new Span(expandedText);
+            expandedSpan.addClassName("bm-cand-dim-expanded");
+            row.add(expandedSpan);
+        }
         return row;
     }
 

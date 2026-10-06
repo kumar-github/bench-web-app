@@ -17,6 +17,11 @@ public record MatchRow(
         String oneLiner,
         String skillSignal,
         String bandSignal,
-        String locationSignal
+        String locationSignal,
+        // NOT part of the build_matches.py port — see MatchingService.isOneBandBelow()'s Javadoc.
+        // Used only to route an Excluded row into capEmployeeRows()'s separate Override-eligible
+        // bucket instead of the generic near-miss bucket; never persisted onto MatchCandidate
+        // itself (DemandReviewService re-derives this from raw sub-band values at review time).
+        boolean bandOverrideEligible
 ) {
 }

@@ -19,6 +19,7 @@ import com.example.benchmatch.review.dto.DecisionRequest;
 import com.example.benchmatch.review.dto.DemandLifecycleState;
 import com.example.benchmatch.review.dto.ReviewCandidateDto;
 import com.example.benchmatch.review.dto.ReviewQueueItemDto;
+import com.example.benchmatch.review.dto.ReviewQueueResult;
 import com.example.benchmatch.review.dto.ReviewWorkspaceDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,8 +61,15 @@ public class DemandReviewService {
     private static final String CURRENT_USER_EMAIL = "tag-reviewer@bench-match.local";
 
     private static final Set<String> STRONG_GOOD = Set.of("Strong", "Good");
+    /**
+     * Shown as ordinary Propose/Reject tiers. The one-sub-band-below Override-eligible bucket is
+     * NOT a tier in this set — it's Excluded, surfaced separately; see {@link #isOverrideEligible}.
+     * Every other Excluded reason (two+ below, too senior, wrong sub-persona, unclassified) stays
+     * fully hidden, per demand-supply-mapping-requirements.md's "never appears on the shortlist at
+     * all" rule for hard excludes.
+     */
     private static final Set<String> SHOWN_TIERS = Set.of("Strong", "Good", "Weak");
-    private static final Map<String, Integer> TIER_RANK = Map.of("Strong", 0, "Good", 1, "Weak", 2);
+    private static final Map<String, Integer> TIER_RANK = Map.of("Strong", 0, "Good", 1, "Weak", 2, "Excluded", 3);
 
     private final DemandEnrichedRepository demandRepository;
     private final SupplyEnrichedRepository supplyRepository;
@@ -94,16 +102,42 @@ public class DemandReviewService {
      */
     @Transactional(readOnly = true)
     public List<ReviewQueueItemDto> queue() {
-        List<DemandEnriched> demands = demandRepository.findByIsActiveTrue().stream()
+        List<DemandEnriched> demands = activeClassifiedDemands();
+        Map<String, List<MatchCandidate>> candidatesByDemand = candidatesByDemand();
+        return buildQueueItems(demands, candidatesByDemand);
+    }
+
+    /**
+     * Queue items + the "no coverage" count together, off ONE match_candidates.findAll() pass —
+     * see ReviewQueueResult's own Javadoc for why this exists alongside {@link #queue()} and
+     * {@link #noCoverageCount()} rather than replacing them: ReviewQueueView is the one caller
+     * that needs both every time it loads, and was previously paying for two full scans to get
+     * them (a 2026-10-06 perf finding).
+     */
+    @Transactional(readOnly = true)
+    public ReviewQueueResult queueAndCoverage() {
+        List<DemandEnriched> demands = activeClassifiedDemands();
+        Map<String, List<MatchCandidate>> candidatesByDemand = candidatesByDemand();
+        return new ReviewQueueResult(buildQueueItems(demands, candidatesByDemand), noCoverageCount(demands, candidatesByDemand));
+    }
+
+    private List<DemandEnriched> activeClassifiedDemands() {
+        return demandRepository.findByIsActiveTrue().stream()
                 .filter(d -> d.getPersona() != null)
                 .toList();
+    }
 
-        Map<String, List<MatchCandidate>> candidatesByDemand = matchCandidateRepository.findAll().stream()
+    private Map<String, List<MatchCandidate>> candidatesByDemand() {
+        return matchCandidateRepository.findAll().stream()
                 .collect(Collectors.groupingBy(MatchCandidate::getDemandId));
+    }
+
+    private List<ReviewQueueItemDto> buildQueueItems(List<DemandEnriched> demands,
+                                                       Map<String, List<MatchCandidate>> candidatesByDemand) {
         Map<String, List<DemandCandidateDecision>> decisionsByDemand = decisionRepository.findAll().stream()
                 .collect(Collectors.groupingBy(DemandCandidateDecision::getDemandId));
         Map<String, Boolean> flaggedByDemand = reviewStateRepository.findAll().stream()
-                .collect(Collectors.toMap(DemandReviewState::getDemandId, DemandReviewState::isNeedsReattention));
+                .collect(Collectors.toMap(DemandReviewState::getDemandId, DemandReviewState::isFlaggedForHiring));
 
         return demands.stream()
                 .map(d -> toQueueItem(d, candidatesByDemand.getOrDefault(d.getDemandId(), List.of()),
@@ -124,11 +158,10 @@ public class DemandReviewService {
      */
     @Transactional(readOnly = true)
     public int noCoverageCount() {
-        List<DemandEnriched> demands = demandRepository.findByIsActiveTrue().stream()
-                .filter(d -> d.getPersona() != null)
-                .toList();
-        Map<String, List<MatchCandidate>> candidatesByDemand = matchCandidateRepository.findAll().stream()
-                .collect(Collectors.groupingBy(MatchCandidate::getDemandId));
+        return noCoverageCount(activeClassifiedDemands(), candidatesByDemand());
+    }
+
+    private int noCoverageCount(List<DemandEnriched> demands, Map<String, List<MatchCandidate>> candidatesByDemand) {
         return (int) demands.stream()
                 .filter(d -> candidatesByDemand.getOrDefault(d.getDemandId(), List.of()).stream()
                         .noneMatch(c -> STRONG_GOOD.contains(c.getOverallTier())))
@@ -140,23 +173,34 @@ public class DemandReviewService {
         DemandEnriched demand = demandRepository.findById(demandId)
                 .orElseThrow(() -> new NoSuchElementException("No demand " + demandId));
 
-        List<MatchCandidate> candidates = matchCandidateRepository.findByDemandId(demandId).stream()
-                .filter(c -> SHOWN_TIERS.contains(c.getOverallTier()))
+        List<MatchCandidate> allMatchRows = matchCandidateRepository.findByDemandId(demandId);
+        // Fetched before filtering (not after, like the old SHOWN_TIERS-only version) because
+        // isOverrideEligible() below needs the employee's raw sub-band to tell a one-below
+        // Excluded row apart from any other hard exclude — see MatchingService.isOneBandBelow().
+        Map<Long, SupplyEnriched> allSupplyById = supplyRepository.findAllById(
+                allMatchRows.stream().map(MatchCandidate::getEmployeeId).toList()
+        ).stream().collect(Collectors.toMap(SupplyEnriched::getEmployeeId, s -> s));
+
+        List<MatchCandidate> candidates = allMatchRows.stream()
+                .filter(c -> SHOWN_TIERS.contains(c.getOverallTier())
+                        || isOverrideEligible(c, allSupplyById.get(c.getEmployeeId()), demand))
                 .sorted(Comparator.comparingInt(c -> TIER_RANK.getOrDefault(c.getOverallTier(), 9)))
                 .toList();
 
         Map<Long, DemandCandidateDecision> decisionByEmployee = decisionRepository.findByDemandId(demandId).stream()
                 .collect(Collectors.toMap(DemandCandidateDecision::getEmployeeId, d -> d));
 
-        Map<Long, SupplyEnriched> supplyById = supplyRepository.findAllById(
-                candidates.stream().map(MatchCandidate::getEmployeeId).toList()
-        ).stream().collect(Collectors.toMap(SupplyEnriched::getEmployeeId, s -> s));
+        Map<Long, SupplyEnriched> supplyById = candidates.stream()
+                .map(MatchCandidate::getEmployeeId)
+                .filter(allSupplyById::containsKey)
+                .collect(Collectors.toMap(id -> id, allSupplyById::get));
 
         Map<Integer, String> userNames = userRepository.findAll().stream()
                 .collect(Collectors.toMap(User::getUserId, User::getDisplayName));
 
         List<ReviewCandidateDto> candidateDtos = candidates.stream()
-                .map(c -> toCandidateDto(c, supplyById.get(c.getEmployeeId()), decisionByEmployee.get(c.getEmployeeId()), userNames))
+                .map(c -> toCandidateDto(c, demand, supplyById.get(c.getEmployeeId()),
+                        decisionByEmployee.get(c.getEmployeeId()), userNames))
                 .toList();
 
         DemandLifecycleState lifecycle = lifecycleOf(demand, candidates, decisionByEmployee.values());
@@ -173,22 +217,42 @@ public class DemandReviewService {
     }
 
     /**
-     * Records a Propose ("approved") or Reject ("rejected") decision on one (demand, employee)
-     * pair — an upsert against demand_candidate_decisions' own UNIQUE (demand_id, employee_id), a
-     * full status-change row in decision_history, then the refreshed workspace so the view can
-     * auto-advance if that was the last undecided candidate.
+     * Records a Propose ("approved"), Reject ("rejected"), or Override ("overridden") decision on
+     * one (demand, employee) pair — an upsert against demand_candidate_decisions' own UNIQUE
+     * (demand_id, employee_id), a full status-change row in decision_history, then the refreshed
+     * workspace so the view can auto-advance if that was the last undecided candidate.
+     * <p>
+     * Override is validated as its OWN action, not interchangeable with Propose, per the
+     * requirements doc's "kept separate... so it's never mistaken for an ordinary approval":
+     * Override is only valid against the one-sub-band-below Excluded candidate it exists for, and
+     * Propose/Reject are only valid against an ordinarily-shown Strong/Good/Weak candidate.
      */
     @Transactional
     public ReviewWorkspaceDto decide(String demandId, Long employeeId, DecisionRequest request) {
         String action = request.action();
-        if (!DemandCandidateDecision.STATUS_APPROVED.equals(action) && !DemandCandidateDecision.STATUS_REJECTED.equals(action)) {
+        boolean isOverrideAction = DemandCandidateDecision.STATUS_OVERRIDDEN.equals(action);
+        if (!DemandCandidateDecision.STATUS_APPROVED.equals(action) && !DemandCandidateDecision.STATUS_REJECTED.equals(action)
+                && !isOverrideAction) {
             throw new IllegalArgumentException("Unsupported decision action: " + action);
         }
 
-        String engineTier = matchCandidateRepository.findByDemandId(demandId).stream()
+        MatchCandidate candidate = matchCandidateRepository.findByDemandId(demandId).stream()
                 .filter(c -> c.getEmployeeId().equals(employeeId))
-                .map(MatchCandidate::getOverallTier)
                 .findFirst().orElse(null);
+        String engineTier = candidate == null ? null : candidate.getOverallTier();
+        DemandEnriched demandForCheck = demandRepository.findById(demandId).orElse(null);
+        SupplyEnriched supplyForCheck = supplyRepository.findById(employeeId).orElse(null);
+        boolean overrideEligible = candidate != null
+                && isOverrideEligible(candidate, supplyForCheck, demandForCheck);
+
+        if (isOverrideAction && !overrideEligible) {
+            throw new IllegalArgumentException(
+                    "Override is only valid for the one-sub-band-below Excluded candidate it exists for");
+        }
+        if (!isOverrideAction && DemandCandidateDecision.STATUS_APPROVED.equals(action) && overrideEligible) {
+            throw new IllegalArgumentException(
+                    "This candidate is band-excluded — use Override instead of Propose, so it's never mistaken for an ordinary approval");
+        }
 
         DemandCandidateDecision decision = decisionRepository.findByDemandIdAndEmployeeId(demandId, employeeId)
                 .orElseGet(() -> new DemandCandidateDecision(demandId, employeeId));
@@ -246,7 +310,8 @@ public class DemandReviewService {
         int approvedCount = (int) decisions.stream().filter(dec -> DemandCandidateDecision.STATUS_APPROVED.equals(dec.getStatus())).count();
         int decidedCount = (int) decisions.stream()
                 .filter(dec -> DemandCandidateDecision.STATUS_APPROVED.equals(dec.getStatus())
-                        || DemandCandidateDecision.STATUS_REJECTED.equals(dec.getStatus()))
+                        || DemandCandidateDecision.STATUS_REJECTED.equals(dec.getStatus())
+                        || DemandCandidateDecision.STATUS_OVERRIDDEN.equals(dec.getStatus()))
                 .count();
         Set<Long> decidedEmployeeIds = decisions.stream()
                 .filter(dec -> DemandCandidateDecision.STATUS_APPROVED.equals(dec.getStatus())
@@ -268,18 +333,20 @@ public class DemandReviewService {
     }
 
     /**
-     * The Review queue's "Flag for hiring" action on an EXHAUSTED demand — repurposes
-     * demand_review_state's needs_reattention/reattention_reason (see {@link DemandReviewState}'s
-     * Javadoc) rather than adding a new column. Idempotent upsert, same pattern {@link #decide}
-     * already uses against demand_candidate_decisions.
+     * The Review queue's "Flag for hiring" action on an EXHAUSTED demand — writes
+     * demand_review_state's own flagged_for_hiring/flagged_for_hiring_reason/_by/_at columns (added
+     * by V12__flagged_for_hiring_column.sql, split out from needs_reattention/reattention_reason —
+     * see {@link DemandReviewState}'s Javadoc for why). Idempotent upsert, same pattern
+     * {@link #decide} already uses against demand_candidate_decisions.
      */
     @Transactional
     public void flagForHiring(String demandId) {
         DemandReviewState state = reviewStateRepository.findById(demandId)
                 .orElseGet(() -> new DemandReviewState(demandId));
-        state.setNeedsReattention(true);
-        state.setReattentionReason("Flagged for hiring on " + OffsetDateTime.now()
-                + " — every Strong/Good candidate already Proposed or Rejected, positions remain open");
+        state.setFlaggedForHiring(true);
+        state.setFlaggedForHiringReason("Every Strong/Good candidate already Proposed or Rejected, positions remain open");
+        state.setFlaggedForHiringBy(currentUser().getUserId());
+        state.setFlaggedForHiringAt(OffsetDateTime.now());
         reviewStateRepository.save(state);
     }
 
@@ -305,20 +372,86 @@ public class DemandReviewService {
         return DemandLifecycleState.OPEN;
     }
 
-    private ReviewCandidateDto toCandidateDto(MatchCandidate c, SupplyEnriched supply,
+    /**
+     * True only for the one-sub-band-below Override-eligible case. Recomputed from the raw
+     * sub-band values rather than read off {@code c.getBandSignal()} — match_candidates.band_signal
+     * stores the ported "below" quality for ANY amount below (see MatchingService.bandSignal()'s
+     * own comment), so the one-below distinction isn't persisted there; MatchingService.isOneBandBelow()
+     * is the one source of truth for it. Returns false (not eligible) if either side's row has
+     * since gone missing.
+     */
+    private boolean isOverrideEligible(MatchCandidate c, SupplyEnriched supply, DemandEnriched demand) {
+        if (!"Excluded".equals(c.getOverallTier()) || supply == null || demand == null) {
+            return false;
+        }
+        return matchingService.isOneBandBelow(supply.getSubBand(), demand.getBand());
+    }
+
+    /**
+     * Recomputes all four signals fresh against MatchingService — match_candidates only persists
+     * the quality CODE + the already-folded one_liner (see ReviewCandidateDto's own Javadoc), not
+     * the Collapsed/Expanded text pairs the four-dimension card needs. Mirrors the pattern
+     * MatchingRunService/ShortlistWorkbookService already use (including their own private
+     * toClassificationResult() duplicates) — a third copy here follows that same established
+     * precedent rather than extracting shared code, per this codebase's own stated tradeoff
+     * (independently readable classes over DRY at this size).
+     */
+    private ReviewCandidateDto toCandidateDto(MatchCandidate c, DemandEnriched demand, SupplyEnriched supply,
                                                DemandCandidateDecision decision, Map<Integer, String> userNames) {
+        if (supply == null) {
+            // Supply row went inactive/was removed since the last matching run — match_candidates
+            // is re-derivable but may be briefly stale; show a bare placeholder rather than fail
+            // the whole workspace over one dangling row.
+            return new ReviewCandidateDto(
+                    c.getEmployeeId(), "Employee #" + c.getEmployeeId(), null, null, null, null, null,
+                    c.getOverallTier(), c.getOneLiner(),
+                    null, null, null, null, null, null, null, null,
+                    false, // no supply row to check against — can't be override-eligible
+                    decision == null ? null : decision.getStatus(),
+                    decision == null ? null : decision.getDecidedAt(),
+                    decision == null || decision.getDecidedBy() == null ? null : userNames.get(decision.getDecidedBy())
+            );
+        }
+
+        var skill = matchingService.skillSignal(toClassificationResult(supply), toClassificationResult(demand));
+        var band = matchingService.bandSignal(supply.getSubBand(), demand.getBand());
+        var location = matchingService.locationSignal(supply.getLocation(), demand.getLocation(), null);
+        var assessment = matchingService.assessmentSignal(supply.getRating(), supply.getScore());
+
         return new ReviewCandidateDto(
-                c.getEmployeeId(),
-                supply == null ? "Employee #" + c.getEmployeeId() : supply.getEmployeeName(),
-                supply == null ? null : supply.getBand(),
-                supply == null ? null : supply.getSubBand(),
-                supply == null ? null : supply.getLocation(),
-                supply == null ? null : supply.getBenchAgeingDays(),
-                supply == null ? null : supply.getRating(),
-                c.getOverallTier(), c.getSkillSignal(), c.getBandSignal(), c.getLocationSignal(), c.getOneLiner(),
+                c.getEmployeeId(), supply.getEmployeeName(), supply.getBand(), supply.getSubBand(),
+                supply.getLocation(), supply.getBenchAgeingDays(), supply.getRating(),
+                c.getOverallTier(), c.getOneLiner(),
+                skill.collapsed(), skill.expanded(),
+                band.collapsed(), band.expanded(),
+                location.collapsed(), location.expanded(),
+                assessment.collapsed(), assessment.expanded(),
+                isOverrideEligible(c, supply, demand),
                 decision == null ? null : decision.getStatus(),
                 decision == null ? null : decision.getDecidedAt(),
                 decision == null || decision.getDecidedBy() == null ? null : userNames.get(decision.getDecidedBy())
+        );
+    }
+
+    private com.example.benchmatch.matching.ClassificationResult toClassificationResult(SupplyEnriched emp) {
+        return new com.example.benchmatch.matching.ClassificationResult(
+                emp.getPersona() == null ? null : emp.getPersona().getName(),
+                emp.getSubPersona() == null ? null : emp.getSubPersona().getName(),
+                emp.getNamedAccessories(),
+                emp.getCompleteness(),
+                emp.getFrameworkConfirmed(),
+                null // status is never read by skillSignal()/assessmentSignal() on the supply side
+        );
+    }
+
+    private com.example.benchmatch.matching.ClassificationResult toClassificationResult(DemandEnriched dem) {
+        return new com.example.benchmatch.matching.ClassificationResult(
+                dem.getPersona() == null ? null : dem.getPersona().getName(),
+                dem.getSubPersona() == null ? null : dem.getSubPersona().getName(),
+                dem.getNamedAccessories(),
+                null, // demand classification never produces a completeness value
+                dem.getFrameworkConfirmed(),
+                dem.getClassificationNote()
         );
     }
 }

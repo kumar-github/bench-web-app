@@ -118,8 +118,18 @@ public class MatchingRunVerification {
                 int ageingRank = svc.ageingRank(demRow.get("Due Category_New"));
                 Integer balancePositions = parseInt(demRow.get("Balance Positions"));
 
+                // bandOverrideEligible mirrors MatchingRunService's own computation — see
+                // MatchingService.isOneBandBelow()'s Javadoc. NOTE this means capEmployeeRows()
+                // here now matches MatchingRunService's production behavior (an extra, additive
+                // Override-eligible bucket on top of the existing Excluded near-miss cap), which
+                // is a deliberate 2026-10-06 divergence from build_matches.py's own capping — this
+                // harness's ground-truth ("ground_truth" CSV) ExTRA/mismatch counts will now show
+                // extra one-band-below Excluded rows that Python's output never had. That is
+                // expected, not a bug to chase.
+                boolean bandOverrideEligible = svc.isOneBandBelow(
+                        empRow.get("Sub Band"), demRow.get("Demand Sub Band Name"));
                 empRows.add(new MatchRow(null, reqId, tier, skill.quality(), ageingRank, balancePositions,
-                        oneLiner, skill.quality(), band.quality(), location.quality()));
+                        oneLiner, skill.quality(), band.quality(), location.quality(), bandOverrideEligible));
                 // stash assessment rank alongside via a side map since MatchRow has no slot for it
                 assessmentRankByKey.put(empCode + "|" + reqId, assessment.rank());
             }

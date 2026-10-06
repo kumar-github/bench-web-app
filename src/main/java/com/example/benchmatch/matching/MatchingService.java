@@ -60,6 +60,12 @@ public class MatchingService {
     private static final int MAX_WEAK_FALLBACK_PER_EMPLOYEE = 10;
     private static final int MAX_EXCLUDED_PER_EMPLOYEE = 3;
     /**
+     * Cap on the separate "below_one"/Override-eligible bucket carved out of capEmployeeRows()
+     * below — kept small for the same reason MAX_EXCLUDED_PER_EMPLOYEE is, just a sanity bound
+     * against a pathological persona/demand mix, not a tuned business number.
+     */
+    private static final int MAX_BAND_OVERRIDE_PER_EMPLOYEE = 5;
+    /**
      * A Java/.NET/Frontend "still fairly close" skill miss — same three-way split cap_employee_rows()'s miss_distance()
      * uses, build_matches.py lines 351-360.
      */
@@ -81,6 +87,15 @@ public class MatchingService {
         }
         int diff = ei - di;
         if (diff < 0) {
+            // Kept as an exact, unmodified port of build_matches.py's band_signal() — "below"
+            // covers ANY amount below, with no quality-level distinction between one sub-band
+            // below and two-or-more. Deliberately NOT split here even though the Review
+            // interaction model's Override action only applies to the one-below case: splitting
+            // this method's own quality/collapsed/expanded text would change what
+            // ShortlistWorkbookService's Excel export shows and what MatchingRunVerification
+            // diffs against the Python ground truth, for zero benefit — see isOneBandBelow()
+            // below, which answers the one-below question as an orthogonal, additive check
+            // instead of touching this port.
             return new SignalResult("below", true,
                     "Below the ask — excluded",
                     "Employee " + empSubBand + " is below demand's " + demSubBand + " — hard exclude");
@@ -99,6 +114,21 @@ public class MatchingService {
         return new SignalResult("exact", false,
                 "Exact band match",
                 "Employee " + empSubBand + " = demand " + demSubBand + " (exact)");
+    }
+
+    /**
+     * NOT part of the build_matches.py port — a new, additive, Java-only check for the Review
+     * interaction model's Override action ("a distinct, deliberate action specifically for the
+     * 'below policy' tier (one-band-below candidates)"). Deliberately kept separate from
+     * {@link #bandSignal} itself (see that method's comment) so this new business rule can never
+     * perturb the ported quality/collapsed/expanded text that the Excel export and
+     * MatchingRunVerification's ground-truth parity check both depend on. Returns false for an
+     * unresolved band ladder position, same as bandSignal() would.
+     */
+    public boolean isOneBandBelow(String empSubBand, String demSubBand) {
+        Integer ei = Engine.bandIndex(empSubBand);
+        Integer di = Engine.bandIndex(demSubBand);
+        return ei != null && di != null && ei - di == -1;
     }
 
     // -----------------------------------------------------------------
@@ -397,7 +427,14 @@ public class MatchingService {
         List<MatchRow> strong = empRows.stream().filter(r -> "Strong".equals(r.overallTier())).toList();
         List<MatchRow> good = empRows.stream().filter(r -> "Good".equals(r.overallTier())).toList();
         List<MatchRow> weak = empRows.stream().filter(r -> "Weak".equals(r.overallTier())).toList();
-        List<MatchRow> excluded = empRows.stream().filter(r -> "Excluded".equals(r.overallTier())).toList();
+        // One-sub-band-below rows are split out of the generic Excluded near-miss bucket below —
+        // it's a deliberate, named Override-eligible case (see isOneBandBelow()'s Javadoc), not a
+        // skill near-miss, so it gets its own uncrowded cap/sort rather than competing with
+        // ordinary Excluded near-misses for MAX_EXCLUDED_PER_EMPLOYEE slots.
+        List<MatchRow> bandOverrideEligible = empRows.stream()
+                .filter(r -> "Excluded".equals(r.overallTier()) && r.bandOverrideEligible()).toList();
+        List<MatchRow> excluded = empRows.stream()
+                .filter(r -> "Excluded".equals(r.overallTier()) && !r.bandOverrideEligible()).toList();
 
         // sorted(..., key=lambda r: (r['ageing_rank'], -r['balance_positions']))
         // balance_positions is null-safe here (treated as 0) as a defensive
@@ -431,10 +468,16 @@ public class MatchingService {
                 .limit(MAX_EXCLUDED_PER_EMPLOYEE)
                 .toList();
 
+        List<MatchRow> bandOverrideKept = bandOverrideEligible.stream()
+                .sorted(byUrgencyThenOpenPositions)
+                .limit(MAX_BAND_OVERRIDE_PER_EMPLOYEE)
+                .toList();
+
         List<MatchRow> result = new ArrayList<>(strong);
         result.addAll(goodKept);
         result.addAll(weakKept);
         result.addAll(excludedKept);
+        result.addAll(bandOverrideKept);
         return result;
     }
 

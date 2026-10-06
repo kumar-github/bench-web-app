@@ -3,6 +3,7 @@ package com.example.benchmatch.view;
 import com.example.benchmatch.review.DemandReviewService;
 import com.example.benchmatch.review.dto.DemandLifecycleState;
 import com.example.benchmatch.review.dto.ReviewQueueItemDto;
+import com.example.benchmatch.review.dto.ReviewQueueResult;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -11,6 +12,7 @@ import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.data.value.ValueChangeMode;
@@ -21,10 +23,13 @@ import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
 
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Demand-side Review landing page — every actionable demand (≥1 Strong/Good candidate) that isn't
@@ -44,6 +49,16 @@ import java.util.Set;
  * {@code List<ReviewQueueItemDto>}; paging/search/urgency grouping all happen here, client-side,
  * over that list — fine at this row count (hundreds, not thousands), same reasoning that list's own
  * Javadoc already gives for not needing a Pageable-aware counterpart.
+ * <p>
+ * 2026-10-06: the mock's Persona/Band/Location filter chips and "Sort: Urgency ▾" dropdown were
+ * flagged as decorative (present visually, not wired to anything) in that same UI/UX pass. Wired
+ * up here rather than left as-is or dropped, since the backing data (persona/band/location on
+ * {@link ReviewQueueItemDto}) was already available and the filtering/sorting itself is cheap at
+ * this row count — same "build it real, don't fabricate or silently drop it" call already made
+ * elsewhere in this app (see {@code DashboardView}'s and {@code MainLayout}'s own mock-gap
+ * comments). The "N have zero candidate" stat from that same pass is the one exception: it stays
+ * a plain count, not a link, because its only real target (a Coverage Log view) genuinely doesn't
+ * exist yet — see {@code DemandReviewService.noCoverageCount()}'s Javadoc.
  */
 @Route(value = "review", layout = MainLayout.class)
 @PageTitle("Review")
@@ -55,18 +70,39 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private final List<ReviewQueueItemDto> queue;
     private final Set<String> flaggedDemandIds;
 
+    private static final String SORT_URGENCY = "Most urgent first";
+    private static final String SORT_POSITIONS = "Most open positions first";
+    private static final String SORT_CANDIDATES = "Fewest candidates first";
+    private static final String SORT_CUSTOMER = "Customer A–Z";
+
     private final TextField search = new TextField();
     private final Checkbox flaggedOnly = new Checkbox("Flagged for hiring only");
+    private final Select<String> sortSelect = new Select<>();
     private final Div rowsContainer = new Div();
     private final Div paginationContainer = new Div();
+
+    // Multi-select-within-group, AND-across-groups chip filters (Persona/Band/Location) — see
+    // styles.css's .bm-rev-filterbar comment for why these exist now instead of the mock's static
+    // decoration. Populated from the actual queue's distinct values in buildFilterBar(), not a
+    // fixed list, so a chip never offers a value that would return zero rows.
+    private final Set<String> personaFilters = new LinkedHashSet<>();
+    private final Set<String> bandFilters = new LinkedHashSet<>();
+    private final Set<String> locationFilters = new LinkedHashSet<>();
 
     private Span flaggedCountSpan;
     private List<ReviewQueueItemDto> filtered;
     private int page = 0;
+    private final int noCoverageCount;
 
     public ReviewQueueView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
-        this.queue = reviewService.queue();
+        // One combined call instead of queue() + noCoverageCount() separately — each is its own
+        // full match_candidates.findAll() scan, and this view needs both every single time it's
+        // constructed (which Vaadin does on every navigation back to /review, not just once) — a
+        // real, doubled cost flagged 2026-10-06. See ReviewQueueResult's Javadoc.
+        ReviewQueueResult result = reviewService.queueAndCoverage();
+        this.queue = result.items();
+        this.noCoverageCount = result.noCoverageCount();
         this.filtered = queue;
         this.flaggedDemandIds = new HashSet<>();
         for (ReviewQueueItemDto item : queue) {
@@ -81,6 +117,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
 
         add(buildHeader());
         add(buildToolbar());
+        add(buildFilterBar());
         add(buildLegend());
 
         rowsContainer.addClassName("bm-rev-rows");
@@ -120,7 +157,6 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
 
         int overdue = (int) queue.stream().filter(i -> i.ageingRank() == 0).count();
         int dueSoon = (int) queue.stream().filter(i -> i.ageingRank() == 1).count();
-        int noCoverage = reviewService.noCoverageCount();
 
         Span totalCount = new Span(String.valueOf(queue.size()));
         totalCount.getStyle().set("font-weight", "700").set("color", "var(--bm-ink)").set("font-size", "15px");
@@ -129,7 +165,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         overdueSpan.addClassName("bm-rev-stat-overdue");
         Span dueSoonSpan = new Span(dueSoon + " due this week");
         dueSoonSpan.addClassName("bm-rev-stat-duesoon");
-        Span noCoverageSpan = new Span(noCoverage + " have zero candidate");
+        Span noCoverageSpan = new Span(noCoverageCount + " have zero candidate");
         noCoverageSpan.addClassName("bm-rev-stat-nocoverage");
 
         // Reads flaggedDemandIds (not item.flaggedForHiring()) so a flag clicked earlier in this
@@ -174,6 +210,82 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         return toolbar;
     }
 
+    /**
+     * Persona/Band/Location filter chips + the sort dropdown, built from the actual queue data
+     * (not a static mock copy) — see this class's field-level comment and styles.css's
+     * .bm-rev-filterbar comment for why these were wired up rather than left decorative.
+     */
+    private Div buildFilterBar() {
+        Div chipGroups = new Div(
+                chipGroup("Persona", distinctValues(ReviewQueueItemDto::persona), personaFilters),
+                chipGroup("Band", distinctValues(ReviewQueueItemDto::band), bandFilters),
+                chipGroup("Location", distinctValues(ReviewQueueItemDto::location), locationFilters)
+        );
+        chipGroups.addClassName("bm-rev-chip-groups");
+
+        sortSelect.setItems(SORT_URGENCY, SORT_POSITIONS, SORT_CANDIDATES, SORT_CUSTOMER);
+        sortSelect.setValue(SORT_URGENCY);
+        sortSelect.addClassName("bm-rev-sort");
+        sortSelect.addValueChangeListener(e -> {
+            page = 0;
+            applyFilters();
+            render();
+        });
+
+        Div filterBar = new Div(chipGroups, sortSelect);
+        filterBar.addClassName("bm-rev-filterbar");
+        return filterBar;
+    }
+
+    // TreeSet for a stable, alphabetical chip order regardless of queue order; nulls/blanks
+    // dropped rather than offered as a filterable "—" value, same as the row text already does.
+    private Set<String> distinctValues(java.util.function.Function<ReviewQueueItemDto, String> extractor) {
+        Set<String> values = new TreeSet<>();
+        for (ReviewQueueItemDto item : queue) {
+            String v = extractor.apply(item);
+            if (v != null && !v.isBlank()) {
+                values.add(v);
+            }
+        }
+        return values;
+    }
+
+    private Div chipGroup(String label, Set<String> values, Set<String> activeFilters) {
+        Div group = new Div();
+        group.addClassName("bm-rev-chip-group");
+        if (values.isEmpty()) {
+            return group;
+        }
+        Span groupLabel = new Span(label);
+        groupLabel.addClassName("bm-rev-chip-group-label");
+        group.add(groupLabel);
+        for (String value : values) {
+            Span chip = new Span(value);
+            chip.addClassName("bm-rev-chip");
+            boolean active = activeFilters.contains(value);
+            if (active) {
+                chip.addClassName("bm-rev-chip--active");
+            }
+            chip.addClickListener(e -> {
+                if (activeFilters.contains(value)) {
+                    activeFilters.remove(value);
+                } else {
+                    activeFilters.add(value);
+                }
+                page = 0;
+                applyFilters();
+                render();
+                // Full header/toolbar/filter-bar rebuild would also work, but is unnecessary here:
+                // only this one chip's active state changed, and re-rendering just it avoids
+                // losing focus/scroll position on every click the way a full add()-replace would.
+                chip.setClassName("bm-rev-chip", true);
+                chip.setClassName("bm-rev-chip--active", !active);
+            });
+            group.add(chip);
+        }
+        return group;
+    }
+
     private Div buildLegend() {
         Div legend = new Div(
                 legendItem("var(--bm-rev-overdue)", "Overdue"),
@@ -207,12 +319,39 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         String t = search.getValue() == null ? "" : search.getValue().trim().toLowerCase();
         boolean onlyFlagged = flaggedOnly.getValue();
 
-        filtered = queue.stream()
+        List<ReviewQueueItemDto> result = queue.stream()
                 .filter(i -> t.isEmpty() || containsIgnoreCase(i.demandId(), t)
                         || containsIgnoreCase(i.customer(), t)
                         || containsIgnoreCase(i.projectName(), t))
                 .filter(i -> !onlyFlagged || flaggedDemandIds.contains(i.demandId()))
+                .filter(i -> personaFilters.isEmpty() || personaFilters.contains(i.persona()))
+                .filter(i -> bandFilters.isEmpty() || bandFilters.contains(i.band()))
+                .filter(i -> locationFilters.isEmpty() || locationFilters.contains(i.location()))
                 .toList();
+
+        Comparator<ReviewQueueItemDto> sort = sortComparator();
+        filtered = sort == null ? result : result.stream().sorted(sort).toList();
+    }
+
+    // null = keep the queue's own order (longest-overdue-first, DemandReviewService.queue()'s
+    // default) — the filter/stream calls above are already order-preserving, so there's nothing
+    // to re-sort for the default case; every other option re-sorts the already-filtered list.
+    private Comparator<ReviewQueueItemDto> sortComparator() {
+        String choice = sortSelect.getValue();
+        if (choice == null || SORT_URGENCY.equals(choice)) {
+            return null;
+        }
+        if (SORT_POSITIONS.equals(choice)) {
+            return Comparator.comparingInt((ReviewQueueItemDto i) ->
+                    i.balancePositions() == null ? 0 : i.balancePositions()).reversed();
+        }
+        if (SORT_CANDIDATES.equals(choice)) {
+            return Comparator.comparingInt(i -> i.strongCount() + i.goodCount());
+        }
+        if (SORT_CUSTOMER.equals(choice)) {
+            return Comparator.comparing(i -> i.customer() == null ? "" : i.customer().toLowerCase());
+        }
+        return null;
     }
 
     private boolean containsIgnoreCase(String value, String term) {
@@ -247,8 +386,9 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private void renderPagination(int from, int to, int totalPages) {
         paginationContainer.removeAll();
 
+        String sortLabel = sortSelect.getValue() == null ? SORT_URGENCY : sortSelect.getValue();
         Span caption = new Span("Showing " + (from + 1) + "–" + to + " of " + filtered.size()
-                + ", sorted most urgent first");
+                + ", sorted by " + sortLabel.substring(0, 1).toLowerCase() + sortLabel.substring(1));
         caption.addClassName("bm-rev-pagination-caption");
 
         Div pages = new Div();
@@ -359,7 +499,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         if (exhausted) {
             // Deliberately NOT a single whole-row RouterLink here, unlike the OPEN/non-exhausted
             // case below. "Flag for hiring" needs to be a real, separately-clickable action (it
-            // persists demand_review_state.needs_reattention — see DemandReviewService.
+            // persists demand_review_state.flagged_for_hiring — see DemandReviewService.
             // flagForHiring()'s Javadoc) rather than just more text glued onto a card that
             // navigates on any click; nesting an actionable <button> inside an <a> to get that
             // for free is invalid HTML and unreliable with Vaadin's client-side router

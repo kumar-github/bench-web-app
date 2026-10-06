@@ -15,11 +15,17 @@ import java.time.OffsetDateTime;
  * generated id, so the app assigns it explicitly rather than via {@code @GeneratedValue}.
  * <p>
  * First real use (2026-10-06): the Review queue's "Flag for hiring" action on EXHAUSTED demands
- * (every Strong/Good candidate already Proposed/Rejected, but positions remain open) repurposes
- * {@code needs_reattention}/{@code reattention_reason} — originally scoped in the schema comment
- * for "source text changed since last review" — as a generic "this demand needs a human to look
- * again, and here's why" flag. That's exactly the EXHAUSTED signal too, so a second boolean column
- * isn't needed: one flag, with the reason text saying which case it is.
+ * (every Strong/Good candidate already Proposed/Rejected, but positions remain open). This
+ * originally repurposed {@code needsReattention}/{@code reattentionReason} for it, since that
+ * EXHAUSTED signal looked like the same "needs a human to look again" shape — but
+ * {@code needsReattention} already had an owner: V1's own schema comment scopes it to a future
+ * RefreshService detecting the source Excel row changed under an open review (see
+ * RefreshService's "Known gaps" comment — still unimplemented). Those are two different events
+ * with different triggers (automated/refresh vs. manual/reviewer) and no reason to share state, so
+ * V12__flagged_for_hiring_column.sql split them: {@code flaggedForHiring}/
+ * {@code flaggedForHiringReason}/{@code flaggedForHiringBy}/{@code flaggedForHiringAt} is the
+ * "Flag for hiring" action's own field now, and {@code needsReattention}/{@code reattentionReason}
+ * are left exactly as V1 defined them, free for RefreshService's still-unbuilt purpose.
  */
 @Entity
 @Table(name = "demand_review_state")
@@ -38,11 +44,28 @@ public class DemandReviewState {
     @Column(name = "notes")
     private String notes;
 
+    /**
+     * Reserved for RefreshService's still-unbuilt "source changed under an open review" signal
+     * (V1__init_schema.sql's own intent) — NOT written to by {@link com.example.benchmatch.review.DemandReviewService}
+     * any more as of V12; see this class's Javadoc.
+     */
     @Column(name = "needs_reattention", nullable = false)
     private boolean needsReattention;
 
     @Column(name = "reattention_reason")
     private String reattentionReason;
+
+    @Column(name = "flagged_for_hiring", nullable = false)
+    private boolean flaggedForHiring;
+
+    @Column(name = "flagged_for_hiring_reason")
+    private String flaggedForHiringReason;
+
+    @Column(name = "flagged_for_hiring_by")
+    private Integer flaggedForHiringBy;
+
+    @Column(name = "flagged_for_hiring_at")
+    private OffsetDateTime flaggedForHiringAt;
 
     @Column(name = "closed_by")
     private Integer closedBy;
@@ -99,6 +122,38 @@ public class DemandReviewState {
 
     public void setReattentionReason(String reattentionReason) {
         this.reattentionReason = reattentionReason;
+    }
+
+    public boolean isFlaggedForHiring() {
+        return flaggedForHiring;
+    }
+
+    public void setFlaggedForHiring(boolean flaggedForHiring) {
+        this.flaggedForHiring = flaggedForHiring;
+    }
+
+    public String getFlaggedForHiringReason() {
+        return flaggedForHiringReason;
+    }
+
+    public void setFlaggedForHiringReason(String flaggedForHiringReason) {
+        this.flaggedForHiringReason = flaggedForHiringReason;
+    }
+
+    public Integer getFlaggedForHiringBy() {
+        return flaggedForHiringBy;
+    }
+
+    public void setFlaggedForHiringBy(Integer flaggedForHiringBy) {
+        this.flaggedForHiringBy = flaggedForHiringBy;
+    }
+
+    public OffsetDateTime getFlaggedForHiringAt() {
+        return flaggedForHiringAt;
+    }
+
+    public void setFlaggedForHiringAt(OffsetDateTime flaggedForHiringAt) {
+        this.flaggedForHiringAt = flaggedForHiringAt;
     }
 
     public Integer getClosedBy() {
