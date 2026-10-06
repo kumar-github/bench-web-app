@@ -3,6 +3,7 @@ package com.example.benchmatch.review;
 import com.example.benchmatch.entity.DemandCandidateDecision;
 import com.example.benchmatch.entity.DemandEnriched;
 import com.example.benchmatch.entity.DecisionHistory;
+import com.example.benchmatch.entity.DemandReviewState;
 import com.example.benchmatch.entity.MatchCandidate;
 import com.example.benchmatch.entity.SupplyEnriched;
 import com.example.benchmatch.entity.User;
@@ -10,6 +11,7 @@ import com.example.benchmatch.matching.MatchingService;
 import com.example.benchmatch.repository.DecisionHistoryRepository;
 import com.example.benchmatch.repository.DemandCandidateDecisionRepository;
 import com.example.benchmatch.repository.DemandEnrichedRepository;
+import com.example.benchmatch.repository.DemandReviewStateRepository;
 import com.example.benchmatch.repository.MatchCandidateRepository;
 import com.example.benchmatch.repository.SupplyEnrichedRepository;
 import com.example.benchmatch.repository.UserRepository;
@@ -68,12 +70,13 @@ public class DemandReviewService {
     private final DecisionHistoryRepository historyRepository;
     private final UserRepository userRepository;
     private final MatchingService matchingService;
+    private final DemandReviewStateRepository reviewStateRepository;
 
     public DemandReviewService(DemandEnrichedRepository demandRepository, SupplyEnrichedRepository supplyRepository,
                                 MatchCandidateRepository matchCandidateRepository,
                                 DemandCandidateDecisionRepository decisionRepository,
                                 DecisionHistoryRepository historyRepository, UserRepository userRepository,
-                                MatchingService matchingService) {
+                                MatchingService matchingService, DemandReviewStateRepository reviewStateRepository) {
         this.demandRepository = demandRepository;
         this.supplyRepository = supplyRepository;
         this.matchCandidateRepository = matchCandidateRepository;
@@ -81,6 +84,7 @@ public class DemandReviewService {
         this.historyRepository = historyRepository;
         this.userRepository = userRepository;
         this.matchingService = matchingService;
+        this.reviewStateRepository = reviewStateRepository;
     }
 
     /**
@@ -98,10 +102,13 @@ public class DemandReviewService {
                 .collect(Collectors.groupingBy(MatchCandidate::getDemandId));
         Map<String, List<DemandCandidateDecision>> decisionsByDemand = decisionRepository.findAll().stream()
                 .collect(Collectors.groupingBy(DemandCandidateDecision::getDemandId));
+        Map<String, Boolean> flaggedByDemand = reviewStateRepository.findAll().stream()
+                .collect(Collectors.toMap(DemandReviewState::getDemandId, DemandReviewState::isNeedsReattention));
 
         return demands.stream()
                 .map(d -> toQueueItem(d, candidatesByDemand.getOrDefault(d.getDemandId(), List.of()),
-                        decisionsByDemand.getOrDefault(d.getDemandId(), List.of())))
+                        decisionsByDemand.getOrDefault(d.getDemandId(), List.of()),
+                        flaggedByDemand.getOrDefault(d.getDemandId(), false)))
                 .filter(item -> item != null && item.lifecycleState() != DemandLifecycleState.FILLED)
                 .sorted(Comparator.<ReviewQueueItemDto>comparingInt(ReviewQueueItemDto::ageingRank)
                         .thenComparingInt(item -> -(item.balancePositions() == null ? 0 : item.balancePositions())))
@@ -226,7 +233,7 @@ public class DemandReviewService {
     }
 
     private ReviewQueueItemDto toQueueItem(DemandEnriched d, List<MatchCandidate> candidates,
-                                            List<DemandCandidateDecision> decisions) {
+                                            List<DemandCandidateDecision> decisions, boolean flaggedForHiring) {
         List<MatchCandidate> strongGood = candidates.stream().filter(c -> STRONG_GOOD.contains(c.getOverallTier())).toList();
         if (strongGood.isEmpty()) {
             return null; // not actionable — belongs on a future "No Coverage"/Coverage Log view, not here
@@ -255,8 +262,25 @@ public class DemandReviewService {
                 d.getLocation(), d.getBand(), d.getCustomer(), d.getProjectName(),
                 d.getBalancePositions(), d.getDueCategory(), d.getNewAgeing(),
                 matchingService.ageingRank(d.getDueCategory()),
-                lifecycle, strongCount, goodCount, weakCount, decidedCount, undecidedStrongGood, approvedCount
+                lifecycle, strongCount, goodCount, weakCount, decidedCount, undecidedStrongGood, approvedCount,
+                flaggedForHiring
         );
+    }
+
+    /**
+     * The Review queue's "Flag for hiring" action on an EXHAUSTED demand — repurposes
+     * demand_review_state's needs_reattention/reattention_reason (see {@link DemandReviewState}'s
+     * Javadoc) rather than adding a new column. Idempotent upsert, same pattern {@link #decide}
+     * already uses against demand_candidate_decisions.
+     */
+    @Transactional
+    public void flagForHiring(String demandId) {
+        DemandReviewState state = reviewStateRepository.findById(demandId)
+                .orElseGet(() -> new DemandReviewState(demandId));
+        state.setNeedsReattention(true);
+        state.setReattentionReason("Flagged for hiring on " + OffsetDateTime.now()
+                + " — every Strong/Good candidate already Proposed or Rejected, positions remain open");
+        reviewStateRepository.save(state);
     }
 
     private DemandLifecycleState lifecycleOf(DemandEnriched d, List<MatchCandidate> candidates,

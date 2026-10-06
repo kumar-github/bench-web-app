@@ -19,6 +19,7 @@ public record ReviewQueueItemDto(
         int weakCount,
         int decidedCount,
         int undecidedStrongGoodCount,
-        int approvedCount
+        int approvedCount,
+        boolean flaggedForHiring
 ) {
 }

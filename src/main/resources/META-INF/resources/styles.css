@@ -612,6 +612,11 @@
     font-weight: 600;
 }
 
+.bm-rev-stat-flagged {
+    color: var(--bm-muted-ink);
+    font-weight: 600;
+}
+
 .bm-rev-toolbar {
     display: flex;
     align-items: center;
@@ -630,6 +635,24 @@
 
 .bm-rev-search input {
     background: var(--bm-content-bg);
+}
+
+.bm-rev-flagged-filter {
+    font-size: 13px;
+    color: var(--bm-muted-ink);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Carries forward onto a demand that re-enters OPEN after being flagged while EXHAUSTED — see
+   ReviewQueueView.buildRow()'s comment on why this badge isn't only in the EXHAUSTED branch. */
+.bm-rev-flagged-badge {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--bm-muted-ink);
+    white-space: nowrap;
 }
 
 .bm-rev-legend {
@@ -694,6 +717,9 @@
 
 .bm-rev-row--exhausted:hover {
     background: #f6f1e6;
+    /* Not a link (see ReviewQueueView.buildRow()'s comment) — only its two actions are
+       clickable, so the whole-card pointer cursor .bm-rev-row:hover sets would be misleading. */
+    cursor: default;
 }
 
 .bm-rev-urgency {
@@ -702,6 +728,7 @@
 }
 
 .bm-rev-urgency-label {
+    display: block;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: .3px;
@@ -722,6 +749,7 @@
 }
 
 .bm-rev-id {
+    display: block;
     font-size: 15px;
     font-weight: 650;
 }
@@ -732,11 +760,13 @@
 }
 
 .bm-rev-title {
+    display: block;
     font-size: 13.5px;
     font-weight: 600;
 }
 
 .bm-rev-sub {
+    display: block;
     font-size: 12.5px;
     color: var(--bm-muted-ink);
     margin-top: 2px;
@@ -749,11 +779,13 @@
 }
 
 .bm-rev-positions-main {
+    display: block;
     font-size: 13px;
     font-weight: 600;
 }
 
 .bm-rev-positions-sub {
+    display: block;
     font-size: 12px;
     color: var(--bm-muted-ink);
 }
@@ -805,6 +837,40 @@
 
 .bm-rev-cta--muted {
     color: var(--bm-muted-ink);
+}
+
+/* EXHAUSTED rows' two distinct actions ("View" + "Flag for hiring") — see ReviewQueueView.
+   buildExhaustedActions()'s comment for why this isn't the same whole-row-link pattern the other
+   rows use. */
+.bm-rev-exhausted-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
+.bm-rev-flag-btn {
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--bm-rev-cta);
+    color: var(--bm-rev-cta);
+    background: #ffffff;
+}
+
+.bm-rev-flag-btn:hover:not(:disabled) {
+    background: var(--bm-rev-cta);
+    color: #ffffff;
+}
+
+.bm-rev-flag-btn--done,
+.bm-rev-flag-btn--done:hover {
+    border-color: #d7dbe0;
+    color: var(--bm-muted-ink);
+    background: #f1f2f4;
+    cursor: default;
 }
 
 .bm-rev-note {

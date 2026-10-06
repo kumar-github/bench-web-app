@@ -4,19 +4,27 @@ import com.example.benchmatch.review.DemandReviewService;
 import com.example.benchmatch.review.dto.DemandLifecycleState;
 import com.example.benchmatch.review.dto.ReviewQueueItemDto;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Demand-side Review landing page — every actionable demand (≥1 Strong/Good candidate) that isn't
@@ -39,17 +47,20 @@ import java.util.List;
  */
 @Route(value = "review", layout = MainLayout.class)
 @PageTitle("Review")
-public class ReviewQueueView extends VerticalLayout {
+public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final int PAGE_SIZE = 20;
 
     private final DemandReviewService reviewService;
     private final List<ReviewQueueItemDto> queue;
+    private final Set<String> flaggedDemandIds;
 
     private final TextField search = new TextField();
+    private final Checkbox flaggedOnly = new Checkbox("Flagged for hiring only");
     private final Div rowsContainer = new Div();
     private final Div paginationContainer = new Div();
 
+    private Span flaggedCountSpan;
     private List<ReviewQueueItemDto> filtered;
     private int page = 0;
 
@@ -57,6 +68,12 @@ public class ReviewQueueView extends VerticalLayout {
         this.reviewService = reviewService;
         this.queue = reviewService.queue();
         this.filtered = queue;
+        this.flaggedDemandIds = new HashSet<>();
+        for (ReviewQueueItemDto item : queue) {
+            if (item.flaggedForHiring()) {
+                flaggedDemandIds.add(item.demandId());
+            }
+        }
 
         setSizeFull();
         setPadding(true);
@@ -74,7 +91,26 @@ public class ReviewQueueView extends VerticalLayout {
 
         paginationContainer.setWidthFull();
         add(paginationContainer);
+    }
 
+    /**
+     * Reads the "page" query param (1-indexed in the URL, matching the visible page-number
+     * buttons) so a reviewer who opens a demand from, say, page 6 and comes back via
+     * {@link ReviewWorkspaceView}'s "Back to queue" link lands on page 6 again instead of being
+     * dumped back to page 1 — a real workflow cost at 247+ demands that a 2026-10-05 UI/UX pass
+     * flagged and this fixes. Runs before the view is shown, so {@code render()} only happens
+     * here, not in the constructor (query params aren't known yet at construction time).
+     */
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        List<String> pageParam = event.getLocation().getQueryParameters().getParameters().get("page");
+        if (pageParam != null && !pageParam.isEmpty()) {
+            try {
+                page = Math.max(0, Integer.parseInt(pageParam.get(0)) - 1);
+            } catch (NumberFormatException ignored) {
+                page = 0;
+            }
+        }
         render();
     }
 
@@ -96,12 +132,22 @@ public class ReviewQueueView extends VerticalLayout {
         Span noCoverageSpan = new Span(noCoverage + " have zero candidate");
         noCoverageSpan.addClassName("bm-rev-stat-nocoverage");
 
-        Div stats = new Div(total, overdueSpan, dueSoonSpan, noCoverageSpan);
+        // Reads flaggedDemandIds (not item.flaggedForHiring()) so a flag clicked earlier in this
+        // same page view — before any reload — is reflected immediately, same reasoning the
+        // "Flagged only" checkbox below and the row badges use.
+        flaggedCountSpan = new Span(flaggedDemandIds.size() + " flagged for hiring");
+        flaggedCountSpan.addClassName("bm-rev-stat-flagged");
+
+        Div stats = new Div(total, overdueSpan, dueSoonSpan, noCoverageSpan, flaggedCountSpan);
         stats.addClassName("bm-rev-stats");
 
         Div header = new Div(title, stats);
         header.addClassName("bm-rev-header");
         return header;
+    }
+
+    private void refreshFlaggedCount() {
+        flaggedCountSpan.setText(flaggedDemandIds.size() + " flagged for hiring");
     }
 
     private Div buildToolbar() {
@@ -111,12 +157,19 @@ public class ReviewQueueView extends VerticalLayout {
         search.addThemeVariants(TextFieldVariant.LUMO_SMALL);
         search.addClassName("bm-rev-search");
         search.addValueChangeListener(e -> {
-            applyFilter(e.getValue());
             page = 0;
+            applyFilters();
             render();
         });
 
-        Div toolbar = new Div(search);
+        flaggedOnly.addClassName("bm-rev-flagged-filter");
+        flaggedOnly.addValueChangeListener(e -> {
+            page = 0;
+            applyFilters();
+            render();
+        });
+
+        Div toolbar = new Div(search, flaggedOnly);
         toolbar.addClassName("bm-rev-toolbar");
         return toolbar;
     }
@@ -150,16 +203,15 @@ public class ReviewQueueView extends VerticalLayout {
         return note;
     }
 
-    private void applyFilter(String term) {
-        String t = term == null ? "" : term.trim().toLowerCase();
-        if (t.isEmpty()) {
-            filtered = queue;
-            return;
-        }
+    private void applyFilters() {
+        String t = search.getValue() == null ? "" : search.getValue().trim().toLowerCase();
+        boolean onlyFlagged = flaggedOnly.getValue();
+
         filtered = queue.stream()
-                .filter(i -> containsIgnoreCase(i.demandId(), t)
+                .filter(i -> t.isEmpty() || containsIgnoreCase(i.demandId(), t)
                         || containsIgnoreCase(i.customer(), t)
                         || containsIgnoreCase(i.projectName(), t))
+                .filter(i -> !onlyFlagged || flaggedDemandIds.contains(i.demandId()))
                 .toList();
     }
 
@@ -230,6 +282,12 @@ public class ReviewQueueView extends VerticalLayout {
         btn.addClickListener(e -> {
             page = targetPage;
             render();
+            // Keep the address bar in sync with the in-memory page — same instance, no reload
+            // (Vaadin reuses the current view for a query-param-only navigation to its own
+            // route), but now the page survives a browser refresh/bookmark/back-button too, not
+            // just a round trip through ReviewWorkspaceView's "Back to queue" link.
+            UI.getCurrent().getPage().getHistory().replaceState(null,
+                    "review?page=" + (targetPage + 1));
         });
         return btn;
     }
@@ -252,6 +310,16 @@ public class ReviewQueueView extends VerticalLayout {
         Span demandId = new Span(item.demandId());
         demandId.addClassName("bm-rev-id");
         urgency.add(urgencyLabel, demandId);
+        // A demand flagged while EXHAUSTED can later re-enter OPEN (a fresh matching run finds a
+        // new Strong/Good candidate) — the flag itself outlives that state change (it's not
+        // cleared anywhere), so this badge has to be checked on every row, not just the
+        // EXHAUSTED-only actions in buildExhaustedActions(), or the flag would silently vanish
+        // from view the moment the demand becomes actionable again.
+        if (flaggedDemandIds.contains(item.demandId())) {
+            Span flaggedBadge = new Span("🚩 Flagged");
+            flaggedBadge.addClassName("bm-rev-flagged-badge");
+            urgency.add(flaggedBadge);
+        }
 
         Div info = new Div();
         info.addClassName("bm-rev-info");
@@ -288,28 +356,70 @@ public class ReviewQueueView extends VerticalLayout {
             pills.add(strong, good);
         }
 
-        Span ctaText = new Span(exhausted ? "Flag for hiring" : "Review");
+        if (exhausted) {
+            // Deliberately NOT a single whole-row RouterLink here, unlike the OPEN/non-exhausted
+            // case below. "Flag for hiring" needs to be a real, separately-clickable action (it
+            // persists demand_review_state.needs_reattention — see DemandReviewService.
+            // flagForHiring()'s Javadoc) rather than just more text glued onto a card that
+            // navigates on any click; nesting an actionable <button> inside an <a> to get that
+            // for free is invalid HTML and unreliable with Vaadin's client-side router
+            // intercepting the anchor click first. So this row is a plain Div with two distinct,
+            // genuinely different actions: "View" (still opens the read-only workspace — useful
+            // to see who was proposed/rejected and when) and the flag action itself.
+            Div row = new Div(urgency, info, positionsBlock, pills, buildExhaustedActions(item));
+            row.addClassName("bm-rev-row");
+            row.addClassName("bm-rev-row--exhausted");
+            return row;
+        }
+
+        Span ctaText = new Span("Review");
         Span arrow = new Span("→");
         Div cta = new Div(ctaText, arrow);
         cta.addClassName("bm-rev-cta");
-        if (exhausted) {
-            cta.addClassName("bm-rev-cta--muted");
-        }
 
         // Text-plus-components constructor, same overload ReviewQueueView already relied on before
         // this rewrite ("Open →") — a RouterLink that also carries a navigation parameter has no
         // no-text overload, so an empty-string text node is unavoidable; it renders as nothing.
         RouterLink row = new RouterLink("", ReviewWorkspaceView.class, item.demandId());
         row.addClassName("bm-rev-row");
-        row.addClassName(rowUrgencyClass(item, exhausted));
+        row.addClassName(rowUrgencyClass(item));
         row.add(urgency, info, positionsBlock, pills, cta);
+        // Carries the current page back through the workspace (see beforeEnter()'s Javadoc) so
+        // "Back to queue"/auto-advance-to-queue lands here again instead of resetting to page 1.
+        row.setQueryParameters(QueryParameters.simple(Map.of("page", String.valueOf(page + 1))));
         return row;
     }
 
-    private String rowUrgencyClass(ReviewQueueItemDto item, boolean exhausted) {
-        if (exhausted) {
-            return "bm-rev-row--exhausted";
+    private Div buildExhaustedActions(ReviewQueueItemDto item) {
+        RouterLink view = new RouterLink("View", ReviewWorkspaceView.class, item.demandId());
+        view.addClassName("bm-rev-cta");
+        view.addClassName("bm-rev-cta--muted");
+        view.setQueryParameters(QueryParameters.simple(Map.of("page", String.valueOf(page + 1))));
+
+        boolean flagged = flaggedDemandIds.contains(item.demandId());
+        Button flagButton = new Button(flagged ? "Flagged ✓" : "Flag for hiring");
+        flagButton.addClassName("bm-rev-flag-btn");
+        if (flagged) {
+            flagButton.addClassName("bm-rev-flag-btn--done");
         }
+        flagButton.setEnabled(!flagged);
+        flagButton.addClickListener(e -> {
+            reviewService.flagForHiring(item.demandId());
+            flaggedDemandIds.add(item.demandId());
+            flagButton.setText("Flagged ✓");
+            flagButton.addClassName("bm-rev-flag-btn--done");
+            flagButton.setEnabled(false);
+            refreshFlaggedCount();
+        });
+
+        Div actions = new Div(view, flagButton);
+        actions.addClassName("bm-rev-exhausted-actions");
+        return actions;
+    }
+
+    // Only called for non-exhausted rows now — EXHAUSTED gets its urgency class applied directly
+    // in buildRow(), since that branch is a plain Div, not this method's RouterLink caller.
+    private String rowUrgencyClass(ReviewQueueItemDto item) {
         return switch (item.ageingRank()) {
             case 0 -> "bm-rev-row--overdue";
             case 1 -> "bm-rev-row--duesoon";

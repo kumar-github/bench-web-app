@@ -14,10 +14,13 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.router.BeforeEvent;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Demand Workspace — the per-demand decision screen opened from {@link ReviewQueueView}. Shows
@@ -42,6 +45,16 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     private final DemandReviewService reviewService;
     private String demandId;
 
+    /**
+     * The Review queue page (1-indexed, matching the URL the queue itself uses) this workspace
+     * was opened from, if any — carried via the "page" query parameter on the RouterLink that
+     * opened it (see ReviewQueueView.buildRow()'s comment). Threaded through every navigation
+     * back toward the queue below (the plain back link, and both of decide()'s auto-navigate
+     * cases) so a reviewer working through page 6 of 13 doesn't get dumped back to page 1 after
+     * every single decision — the #1 UI/UX gap flagged on 2026-10-06.
+     */
+    private String fromPage;
+
     public ReviewWorkspaceView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
         addClassName("bm-dash");
@@ -50,7 +63,13 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     @Override
     public void setParameter(BeforeEvent event, String demandId) {
         this.demandId = demandId;
+        List<String> pageParam = event.getLocation().getQueryParameters().getParameters().get("page");
+        this.fromPage = (pageParam == null || pageParam.isEmpty()) ? null : pageParam.get(0);
         render();
+    }
+
+    private QueryParameters backQueryParameters() {
+        return fromPage == null ? QueryParameters.empty() : QueryParameters.simple(Map.of("page", fromPage));
     }
 
     private void render() {
@@ -67,6 +86,7 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     private RouterLink buildBackLink() {
         RouterLink back = new RouterLink("← Back to queue", ReviewQueueView.class);
         back.addClassName("bm-queue-open");
+        back.setQueryParameters(backQueryParameters());
         return back;
     }
 
@@ -161,10 +181,14 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
             // to decide.
             String next = updated.nextDemandId();
             if (next != null) {
-                UI.getCurrent().navigate(ReviewWorkspaceView.class, next);
+                // "review/demand/<id>" is this view's own @Route path (value = "review/demand") —
+                // the string-plus-QueryParameters overload is used instead of the Class-based one
+                // specifically so fromPage survives the auto-advance (see this field's Javadoc);
+                // there's no Class-based navigate(...) overload that also takes QueryParameters.
+                UI.getCurrent().navigate("review/demand/" + next, backQueryParameters());
                 return;
             }
-            UI.getCurrent().navigate(ReviewQueueView.class);
+            UI.getCurrent().navigate("review", backQueryParameters());
             return;
         }
         render();
