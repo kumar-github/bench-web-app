@@ -80,6 +80,16 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
      */
     private static final int OVERRIDE_DISPLAY_LIMIT = 5;
 
+    /**
+     * Override-eligible section collapse state (2026-10-07 decision) — collapsed by default. Same
+     * toggle-button mechanism as {@link #buildExpandAllToggle()} (a local boolean + a Button that
+     * re-renders), not a Vaadin Details/Accordion, to stay visually consistent with the rest of
+     * this screen rather than introducing a second expand/collapse visual language. Independent of
+     * {@link #expandAll} — this toggles whether the override candidates are shown at all, not
+     * whether each one's raw Expanded text is visible.
+     */
+    private boolean overrideExpanded;
+
     public ReviewWorkspaceView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
         addClassName("bm-dash");
@@ -203,6 +213,10 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
 
         Div card = new Div(title, rows);
         card.addClassName("bm-card");
+        // 2026-10-07 "group fence" decision — see styles.css's .bm-cand-section-* comment. One
+        // thin, tier-colored border per section (not per card, not just on the heading) so the
+        // signal survives scrolling through the section, the way .bm-override-section already does.
+        card.addClassName("bm-cand-section-" + tier.toLowerCase(Locale.ROOT));
         return card;
     }
 
@@ -230,13 +244,26 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
                 + "back as an ordinary approval.");
         subtitle.addClassName("bm-card-subtitle");
 
-        Div rows = new Div();
-        rows.addClassName("bm-cand-list");
-        for (ReviewCandidateDto c : eligible) {
-            rows.add(buildCandidateCard(c, true));
-        }
+        Button toggle = new Button(overrideExpanded ? "Hide candidates" : "Show candidates", e -> {
+            overrideExpanded = !overrideExpanded;
+            render();
+        });
+        toggle.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.TERTIARY);
 
-        Div card = new Div(title, subtitle, rows);
+        Div headerRow = new Div(title, toggle);
+        headerRow.getStyle().set("display", "flex").set("justify-content", "space-between").set("align-items", "center");
+
+        Div card;
+        if (overrideExpanded) {
+            Div rows = new Div();
+            rows.addClassName("bm-cand-list");
+            for (ReviewCandidateDto c : eligible) {
+                rows.add(buildCandidateCard(c, true));
+            }
+            card = new Div(headerRow, subtitle, rows);
+        } else {
+            card = new Div(headerRow, subtitle);
+        }
         card.addClassName("bm-card");
         card.addClassName("bm-override-section");
         return card;
@@ -256,7 +283,13 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
 
         Span name = new Span(c.employeeName() + "  (#" + c.employeeId() + ")");
         name.addClassName("bm-queue-name");
-        Span oneLiner = new Span(nz(c.oneLiner()));
+        // Fix 2026-10-07: bm-queue-name/bm-queue-meta/bm-queue-name-line are the same classes
+        // DashboardView.buildQueueRow already uses, and that one reads fine because its meta text
+        // is deliberately prefixed with " · " — these are plain inline Spans with no CSS forcing
+        // a line break, so without a separator they ran straight into the name with no gap at all
+        // (e.g. "Abhijit Bhatta (#52279331)Persona match…"). Matches the existing convention
+        // rather than inventing a new one.
+        Span oneLiner = new Span(" · " + nz(c.oneLiner()));
         oneLiner.addClassName("bm-queue-meta");
         Div nameLine = new Div(name, oneLiner);
         nameLine.addClassName("bm-queue-name-line");

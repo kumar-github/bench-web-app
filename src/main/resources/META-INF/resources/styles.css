@@ -421,6 +421,16 @@
     margin-top: 2px;
 }
 
+/* Fix 2026-10-07: wraps a .bm-card-title-lg + .bm-card-subtitle pair (DashboardView's "Needs
+   attention" card header, ReviewWorkspaceView's demand header) and previously had NO rules at
+   all — a plain Div, so its two Span children (inline by default) sat on the same line with
+   nothing between them, e.g. "Needs attentionLongest-benched first". display:flex column makes
+   each Span its own row; .bm-card-subtitle's existing margin-top: 2px still provides the gap. */
+.bm-card-title-block {
+    display: flex;
+    flex-direction: column;
+}
+
 .bm-queue-header {
     display: flex;
     align-items: center;
@@ -833,6 +843,28 @@ vaadin-grid.bm-grid {
     border-left-color: var(--bm-rev-exhausted);
 }
 
+/* Fix 2026-10-07 (pagination "something changed" signal): applied for one frame before the row is
+   attached, then swapped for -enter-active a tick later (ReviewQueueView.animateRowsIn()) — the two-
+   class handoff a CSS transition needs to actually run instead of snapping straight to the end state.
+   Only ever added when paging; filter/search/sort renders never get this class, so their rows render
+   plainly as before. */
+.bm-rev-row-enter {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.bm-rev-row-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bm-rev-row-enter-active {
+        transition: none;
+    }
+}
+
 .bm-rev-row--exhausted:hover {
     background: #f6f1e6;
     /* Not a link (see ReviewQueueView.buildRow()'s comment) — only its two actions are
@@ -1164,7 +1196,36 @@ vaadin-grid.bm-grid {
     border: 1px dashed var(--bm-rev-duesoon);
 }
 
+/* 2026-10-07 "group fence" decision — mocked up against badge-only, full-card border, header-only
+   border and group-heading-only before landing here. A per-card border either repeated the badge's
+   own signal (header-only, scanned as redundant at a glance) or got visually loud once cards ran to
+   their real 6-7 line height (full-card). Group-heading-only was the opposite problem: the color
+   disappeared the moment you scrolled a card or two past the heading. This wraps the WHOLE section
+   (heading + every card) in one thin border instead, so the signal stays visible for as long as
+   you're inside that tier, same as the existing .bm-override-section above — this just extends
+   that section's own idea to Strong/Good/Weak too. Solid, not dashed: dashed already means
+   "Override, reviewer discretion" via .bm-override-section, and reusing it here would blur that. */
+.bm-cand-section-strong {
+    border-color: var(--bm-rev-ontrack);
+}
+
+.bm-cand-section-good {
+    border-color: var(--bm-amber-ink-strong);
+}
+
+.bm-cand-section-weak {
+    border-color: var(--bm-muted-ink);
+}
+
 .bm-override-btn {
-    background: var(--bm-rev-duesoon);
-    color: #ffffff;
+    /* 2026-10-07: without !important this loses to Aura's own native button theming — the
+       "Override" button only carries ButtonVariant.SMALL (no PRIMARY/CONTAINED/TERTIARY), so
+       Aura's default variant CSS still sets its own background/color on the same <vaadin-button>
+       host at an equal-or-higher effective specificity, and (being the component's own stylesheet)
+       wins the cascade tie. Net effect without this: the default pale background stays, our white
+       text color still applies, and white-on-pale is unreadable — exactly the bug reported. Forcing
+       both declarations is the standard workaround for styling past a Vaadin/Lumo-family component's
+       built-in theme rules. */
+    background: var(--bm-rev-duesoon) !important;
+    color: #ffffff !important;
 }

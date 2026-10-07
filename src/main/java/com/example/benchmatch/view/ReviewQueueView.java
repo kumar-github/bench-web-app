@@ -340,6 +340,18 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private void render() {
+        render(false);
+    }
+
+    /**
+     * 2026-10-07: {@code animateRows} is true only from the pagination buttons' click listener. A
+     * reviewer asked for *something* to signal "new data loaded" when paging, short of a full
+     * scroll animation (discussed and deliberately rejected — in a side-by-side mock, scrolling
+     * alone read as "the page just scrolled", not "the content changed"; a fade felt like the
+     * latter). Scoped to paging only, not filter/search/sort, since those already have their own
+     * visible trigger (the control the reviewer just touched) and don't need a second cue.
+     */
+    private void render(boolean animateRows) {
         rowsContainer.removeAll();
 
         if (filtered.isEmpty()) {
@@ -357,11 +369,36 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         int from = page * PAGE_SIZE;
         int to = Math.min(from + PAGE_SIZE, filtered.size());
 
-        for (ReviewQueueItemDto item : filtered.subList(from, to)) {
-            rowsContainer.add(buildRow(item));
+        List<ReviewQueueItemDto> pageItems = filtered.subList(from, to);
+        for (ReviewQueueItemDto item : pageItems) {
+            Component row = buildRow(item);
+            if (animateRows) {
+                row.getElement().getClassList().add("bm-rev-row-enter");
+            }
+            rowsContainer.add(row);
+        }
+
+        if (animateRows) {
+            animateRowsIn();
         }
 
         renderPagination(from, to, totalPages);
+    }
+
+    // Adds "enter-active" one tick after the rows were added with "enter" already on them, staggered
+    // slightly per row — same two-class technique as a CSS transition requires (the browser needs a
+    // layout/paint with the starting state applied before the transition-triggering class lands, or
+    // it just snaps to the end state with no visible motion). Done from here in one executeJs call on
+    // the container rather than per-row, so it's one round trip, not N.
+    private void animateRowsIn() {
+        rowsContainer.getElement().executeJs(
+                "var rows = this.querySelectorAll('.bm-rev-row-enter');"
+                        + "rows.forEach(function (row, i) {"
+                        + "  setTimeout(function () {"
+                        + "    row.classList.add('bm-rev-row-enter-active');"
+                        + "    row.classList.remove('bm-rev-row-enter');"
+                        + "  }, 20 + i * 18);"
+                        + "});");
     }
 
     private void renderPagination(int from, int to, int totalPages) {
@@ -402,13 +439,22 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         btn.setEnabled(enabled);
         btn.addClickListener(e -> {
             page = targetPage;
-            render();
+            render(true);
             // Keep the address bar in sync with the in-memory page — same instance, no reload
             // (Vaadin reuses the current view for a query-param-only navigation to its own
             // route), but now the page survives a browser refresh/bookmark/back-button too, not
             // just a round trip through ReviewWorkspaceView's "Back to queue" link.
             UI.getCurrent().getPage().getHistory().replaceState(null,
                     "review?page=" + (targetPage + 1));
+            // Fix 2026-10-07: render() swaps this view's rows in place — it doesn't move the
+            // scroll position at all. The actual scrolling element is MainLayout's .bm-outlet
+            // (the shell pins header/sidebar at 100vh with overflow: hidden and lets only the
+            // outlet scroll internally — see styles.css's .bm-shell comment), not the browser
+            // window, so a plain window.scrollTo(0, 0) would be a no-op here. Without this, a
+            // reviewer who pages forward from the bottom of a long list lands on the new page
+            // still scrolled to the bottom, with no visual cue the page actually changed.
+            getElement().executeJs(
+                    "var o = this.closest('.bm-outlet'); if (o) { o.scrollTop = 0; }");
         });
         return btn;
     }
