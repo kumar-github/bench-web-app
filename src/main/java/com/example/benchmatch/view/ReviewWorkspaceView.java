@@ -57,6 +57,29 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
      */
     private boolean expandAll;
 
+    /**
+     * Weak is shown at most once per demand (2026-10-07 decision) — Strong and Good stay uncapped,
+     * but Weak is a last-resort signal ("there's at least one option if nothing else works out"),
+     * not a tier a reviewer needs to review in full. Matches the spirit of
+     * {@code MatchingService.capEmployeeRows()}'s export-side rule (Weak only matters once
+     * Strong/Good run out) without copying it exactly — here Weak is capped unconditionally rather
+     * than suppressed only when Strong/Good are both empty, since the decision was "always show
+     * one," not "show it only as a fallback."
+     */
+    private static final int WEAK_DISPLAY_LIMIT = 1;
+
+    /**
+     * Override-eligible is capped the same way, for the same display-noise reason (2026-10-07
+     * decision) — NOT ranked the way Good's top-3 is in the export (ageing rank / balance
+     * positions), because those are per-DEMAND attributes and this workspace is already scoped to
+     * one demand — every override-eligible row here shares the same demand, so there's nothing to
+     * rank by on that axis. Deliberately just the first N in whatever order the candidate list
+     * already comes back in (the same, currently-unordered, way Strong/Good/Weak are shown within
+     * their own tier) rather than inventing new per-employee ranking logic this view doesn't have
+     * the data for.
+     */
+    private static final int OVERRIDE_DISPLAY_LIMIT = 5;
+
     public ReviewWorkspaceView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
         addClassName("bm-dash");
@@ -99,9 +122,9 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
         add(buildBackLink());
         add(buildDemandHeader(workspace));
         add(buildExpandAllToggle());
-        add(buildCandidateSection("Strong", workspace, "Strong"));
-        add(buildCandidateSection("Good", workspace, "Good"));
-        add(buildCandidateSection("Weak", workspace, "Weak"));
+        add(buildCandidateSection("Strong", workspace, "Strong", null));
+        add(buildCandidateSection("Good", workspace, "Good", null));
+        add(buildCandidateSection("Weak", workspace, "Weak", WEAK_DISPLAY_LIMIT));
         add(buildOverrideSection(workspace));
     }
 
@@ -124,6 +147,11 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
         RouterLink back = new RouterLink("← Back to queue", ReviewQueueView.class);
         back.addClassName("bm-queue-open");
         back.setQueryParameters(backQueryParameters());
+        // Fix 2026-10-07: without this, the anchor — a direct child of this view's `.bm-dash` flex
+        // column, whose default align-items is `stretch` — stretches to the full row width, making
+        // the entire horizontal band clickable even though only the link text is visible.
+        // align-self: flex-start shrinks the clickable area back down to the text's own width.
+        back.getStyle().set("align-self", "flex-start");
         return back;
     }
 
@@ -152,9 +180,12 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
         return header;
     }
 
-    private Div buildCandidateSection(String heading, ReviewWorkspaceDto w, String tier) {
+    private Div buildCandidateSection(String heading, ReviewWorkspaceDto w, String tier, Integer limit) {
         List<ReviewCandidateDto> inTier = w.candidates().stream()
                 .filter(c -> tier.equals(c.overallTier())).toList();
+        if (limit != null && inTier.size() > limit) {
+            inTier = inTier.subList(0, limit);
+        }
 
         Span title = new Span(heading + " (" + inTier.size() + ")");
         title.addClassName("bm-card-title");
@@ -187,6 +218,9 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
                 .filter(ReviewCandidateDto::overrideEligible).toList();
         if (eligible.isEmpty()) {
             return new Div();
+        }
+        if (eligible.size() > OVERRIDE_DISPLAY_LIMIT) {
+            eligible = eligible.subList(0, OVERRIDE_DISPLAY_LIMIT);
         }
 
         Span title = new Span("Override-eligible — one band below the ask (" + eligible.size() + ")");

@@ -1082,8 +1082,14 @@ vaadin-grid.bm-grid {
 }
 
 .bm-cand-card-override {
+    /* 2026-10-07: background tint removed on purpose — it used the same --bm-amber-bg as the "Good"
+       tier badge, so a full-card tint here would've made Override cards read as visually identical
+       to a Good match at a glance, even though they mean very different things (Good = an ordinary
+       engine-ranked tier; Override = outside the engine's band rule, needs a deliberate reviewer
+       call). The thin border-color outline is kept as the section's only card-level signal, on top
+       of the already-distinct "ONE BAND BELOW" badge and the dashed border around the whole section
+       (.bm-override-section, below). */
     border-color: var(--bm-rev-duesoon);
-    background: var(--bm-amber-bg);
 }
 
 .bm-cand-header {
