@@ -8,6 +8,7 @@ import com.example.benchmatch.repository.DemandEnrichedRepository;
 import com.example.benchmatch.repository.MatchCandidateRepository;
 import com.example.benchmatch.repository.RefreshRunRepository;
 import com.example.benchmatch.repository.SupplyEnrichedRepository;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,30 +42,60 @@ import java.util.stream.Collectors;
  * persisted to match_candidates in this schema (only the quality tag + the collapsed-text-built one_liner are). So a
  * demand_enriched.pan_india column was deliberately NOT added; locationSignal() is always called with panIndia=null
  * here, which is provably a no-op for anything this class actually stores.
+ * <p>
+ * Root-caused 2026-10-06 (production incident): {@code POST /api/matching/run} was called twice in quick succession
+ * against the same deployment. Each call is its own transaction doing delete-then-insert with no lock between them, so
+ * under Postgres's default READ COMMITTED isolation both transactions' {@code deleteAllInBatch()} calls saw the same
+ * "before" snapshot, both deleted it, and both then inserted their own new rows under different run_ids — neither
+ * delete removed the other's insert, because neither had committed yet when the other's delete ran. Net result:
+ * match_candidates ended up holding TWO runs' worth of rows simultaneously, violating the "fully truncated and
+ * rewritten every run" invariant this class's own Javadoc states. The fix is the advisory lock below — it stops a
+ * second, overlapping {@link #runMatching()} call from ever reaching the delete/insert section while one is already
+ * in flight, using a Postgres TRANSACTION-level advisory lock ({@code pg_try_advisory_xact_lock}): it's acquired
+ * inside this method's own transaction and auto-releases on commit or rollback (no manual unlock needed, and no
+ * long-held lock surviving on a pooled connection after the method returns — a plain session-level advisory lock
+ * would have that problem since connection-pooled "sessions" are reused across requests). A concurrent second call
+ * fails fast with a clear error instead of silently racing.
  */
 @Service
 public class MatchingRunService {
 
     private static final Logger log = LoggerFactory.getLogger(MatchingRunService.class);
 
+    // Arbitrary fixed key identifying "the matching run" as the thing being locked — any constant
+    // works as long as it's unique to this lock's purpose within the database (pg_advisory_xact_lock
+    // keys are a shared global namespace per database, not scoped to a table or object).
+    private static final long MATCHING_RUN_LOCK_KEY = 88_221_133L;
+
     private final SupplyEnrichedRepository supplyRepo;
     private final DemandEnrichedRepository demandRepo;
     private final MatchCandidateRepository matchRepo;
     private final RefreshRunRepository refreshRunRepo;
     private final MatchingService matchingService;
+    private final EntityManager entityManager;
 
     public MatchingRunService(SupplyEnrichedRepository supplyRepo, DemandEnrichedRepository demandRepo,
                               MatchCandidateRepository matchRepo, RefreshRunRepository refreshRunRepo,
-                              MatchingService matchingService) {
+                              MatchingService matchingService, EntityManager entityManager) {
         this.supplyRepo = supplyRepo;
         this.demandRepo = demandRepo;
         this.matchRepo = matchRepo;
         this.refreshRunRepo = refreshRunRepo;
         this.matchingService = matchingService;
+        this.entityManager = entityManager;
     }
 
     @Transactional
     public RefreshRun runMatching() {
+        // Fails fast, before even creating a RefreshRun row, if another runMatching() call already
+        // holds this lock — see the class Javadoc for why this specific lock type (not a Java-level
+        // synchronized/mutex, which wouldn't help across multiple app instances or processes, and not
+        // a plain session-level advisory lock, which doesn't release cleanly with pooled connections).
+        if (!tryAcquireMatchingRunLock()) {
+            throw new MatchingRunFailedException(
+                    "A matching run is already in progress — wait for it to finish before starting another.", null);
+        }
+
         RefreshRun run = new RefreshRun("matching");
         run = refreshRunRepo.save(run);
         try {
@@ -145,6 +176,23 @@ public class MatchingRunService {
             throw new MatchingRunFailedException("Matching run failed: " + e.getMessage(), e);
         }
         return run;
+    }
+
+    /**
+     * {@code pg_try_advisory_xact_lock} (not the plain {@code pg_try_advisory_lock}) specifically —
+     * the xact variant is scoped to the CURRENT transaction and releases automatically on commit or
+     * rollback, which matters because this method runs under a connection-pooled DataSource: a plain
+     * session-level lock is tied to the physical connection, not to this one logical call, so it can
+     * outlive this method and block a future, unrelated request that happens to reuse the same pooled
+     * connection. Returns false (lock not acquired) immediately rather than blocking, so a second,
+     * overlapping call fails fast instead of queueing up behind the first.
+     */
+    private boolean tryAcquireMatchingRunLock() {
+        Object acquired = entityManager
+                .createNativeQuery("SELECT pg_try_advisory_xact_lock(:lockKey)")
+                .setParameter("lockKey", MATCHING_RUN_LOCK_KEY)
+                .getSingleResult();
+        return Boolean.TRUE.equals(acquired);
     }
 
     /**
