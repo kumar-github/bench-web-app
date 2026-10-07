@@ -1,9 +1,9 @@
 package com.example.benchmatch.review.dto;
 
 /**
- * The three-tier demand lifecycle discussed for the Review queue (not a schema column — computed
- * fresh on every read from demand_enriched.balance_positions, match_candidates, and
- * demand_candidate_decisions, so it can never drift out of sync with those):
+ * The three-tier demand lifecycle discussed for the Review queue (not a schema column — computed fresh on every read
+ * from demand_enriched.balance_positions, match_candidates, and demand_candidate_decisions, so it can never drift out
+ * of sync with those):
  * <ul>
  *   <li>{@link #OPEN} — unfilled positions remain AND at least one Strong/Good candidate is still
  *       undecided. Stays in the main queue.</li>

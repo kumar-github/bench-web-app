@@ -11,23 +11,14 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.router.BeforeEvent;
-import com.vaadin.flow.router.HasUrlParameter;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.QueryParameters;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.router.RouterLink;
+import com.vaadin.flow.router.*;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
- * Demand Workspace — the per-demand decision screen opened from {@link ReviewQueueView}. Shows
- * the demand's own ask (skill cluster, location/band, customer/project, due category) plus every
- * Strong/Good/Weak candidate, grouped by tier, each with Propose/Reject.
+ * Demand Workspace — the per-demand decision screen opened from {@link ReviewQueueView}. Shows the demand's own ask
+ * (skill cluster, location/band, customer/project, due category) plus every Strong/Good/Weak candidate, grouped by
+ * tier, each with Propose/Reject.
  * <p>
  * UX decisions locked in 2026-10-05 (all "Recommended" in the AskUserQuestion round):
  * <ul>
@@ -45,36 +36,48 @@ import java.util.Set;
 public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> {
 
     private final DemandReviewService reviewService;
-    private String demandId;
-
     /**
-     * The Review queue page (1-indexed, matching the URL the queue itself uses) this workspace
-     * was opened from, if any — carried via the "page" query parameter on the RouterLink that
-     * opened it (see ReviewQueueView.buildRow()'s comment). Threaded through every navigation
-     * back toward the queue below (the plain back link, and both of decide()'s auto-navigate
-     * cases) so a reviewer working through page 6 of 13 doesn't get dumped back to page 1 after
-     * every single decision — the #1 UI/UX gap flagged on 2026-10-06.
-     */
-    private String fromPage;
-
-    /**
-     * Per-card expand state ("two states, four dimensions" — collapsed by default, expanded on
-     * click), independent of {@link #expandAll}. Keyed by employeeId since a workspace only ever
-     * shows one demand's candidates at a time.
+     * Per-card expand state ("two states, four dimensions" — collapsed by default, expanded on click), independent of
+     * {@link #expandAll}. Keyed by employeeId since a workspace only ever shows one demand's candidates at a time.
      */
     private final Set<Long> expandedEmployeeIds = new HashSet<>();
-
+    private String demandId;
     /**
-     * The global "expand all" toggle from the requirements doc's "Card expand trigger" decision —
-     * "both mechanisms, not one or the other" — for the audit case where a reviewer wants every
-     * raw value in front of them at once. ORed with expandedEmployeeIds per-card, so toggling it
-     * off doesn't lose individually-expanded cards.
+     * The Review queue page (1-indexed, matching the URL the queue itself uses) this workspace was opened from, if any
+     * — carried via the "page" query parameter on the RouterLink that opened it (see ReviewQueueView.buildRow()'s
+     * comment). Threaded through every navigation back toward the queue below (the plain back link, and both of
+     * decide()'s auto-navigate cases) so a reviewer working through page 6 of 13 doesn't get dumped back to page 1
+     * after every single decision — the #1 UI/UX gap flagged on 2026-10-06.
+     */
+    private String fromPage;
+    /**
+     * The global "expand all" toggle from the requirements doc's "Card expand trigger" decision — "both mechanisms, not
+     * one or the other" — for the audit case where a reviewer wants every raw value in front of them at once. ORed with
+     * expandedEmployeeIds per-card, so toggling it off doesn't lose individually-expanded cards.
      */
     private boolean expandAll;
 
     public ReviewWorkspaceView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
         addClassName("bm-dash");
+    }
+
+    private static String initialsOf(String name) {
+        if (name == null || name.isBlank()) {
+            return "?";
+        }
+        String[] parts = name.trim().split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty() && initials.length() < 2) {
+                initials.append(Character.toUpperCase(part.charAt(0)));
+            }
+        }
+        return initials.isEmpty() ? "?" : initials.toString();
+    }
+
+    private static String nz(String s) {
+        return s == null || s.isBlank() ? "—" : s;
     }
 
     @Override
@@ -103,15 +106,15 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     }
 
     /**
-     * "Both mechanisms, not one or the other" (requirements doc) — this sits alongside, not
-     * instead of, each card's own click-to-expand.
+     * "Both mechanisms, not one or the other" (requirements doc) — this sits alongside, not instead of, each card's own
+     * click-to-expand.
      */
     private Div buildExpandAllToggle() {
         Button toggle = new Button(expandAll ? "Collapse all" : "Expand all", e -> {
             expandAll = !expandAll;
             render();
         });
-        toggle.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+        toggle.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.TERTIARY);
         Div bar = new Div(toggle);
         bar.getStyle().set("display", "flex").set("justify-content", "flex-end");
         return bar;
@@ -173,12 +176,11 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     }
 
     /**
-     * The one-sub-band-below Override-eligible bucket — see ReviewCandidateDto.overrideEligible()'s
-     * Javadoc. A separate section, never mixed into Strong/Good/Weak, so Override is never mistaken
-     * for an ordinary Propose (same reasoning the requirements doc gives for keeping the action
-     * itself distinct). Omitted entirely when there's nothing in it, rather than an always-present
-     * "(0)" section — unlike Strong/Good/Weak, which are always one of the demand's three defined
-     * tiers, this bucket is the exception case, not a default empty state worth showing.
+     * The one-sub-band-below Override-eligible bucket — see ReviewCandidateDto.overrideEligible()'s Javadoc. A separate
+     * section, never mixed into Strong/Good/Weak, so Override is never mistaken for an ordinary Propose (same reasoning
+     * the requirements doc gives for keeping the action itself distinct). Omitted entirely when there's nothing in it,
+     * rather than an always-present "(0)" section — unlike Strong/Good/Weak, which are always one of the demand's three
+     * defined tiers, this bucket is the exception case, not a default empty state worth showing.
      */
     private Div buildOverrideSection(ReviewWorkspaceDto w) {
         List<ReviewCandidateDto> eligible = w.candidates().stream()
@@ -207,10 +209,10 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     }
 
     /**
-     * One "two states, four dimensions" card. Collapsed by default: overall tier/one-liner plus
-     * four dimension rows showing ONLY the plain-English Collapsed text. Expanded (per-card click,
-     * or the global "expand all" toggle): the same four rows also show their raw-value Expanded
-     * text. All four dimensions expand together, never independently, per the requirements doc.
+     * One "two states, four dimensions" card. Collapsed by default: overall tier/one-liner plus four dimension rows
+     * showing ONLY the plain-English Collapsed text. Expanded (per-card click, or the global "expand all" toggle): the
+     * same four rows also show their raw-value Expanded text. All four dimensions expand together, never independently,
+     * per the requirements doc.
      */
     private Div buildCandidateCard(ReviewCandidateDto c, boolean isOverride) {
         boolean expanded = expandAll || expandedEmployeeIds.contains(c.employeeId());
@@ -263,18 +265,18 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
             card.add(status);
         } else if (isOverride) {
             Button override = new Button("Override", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_OVERRIDDEN));
-            override.addThemeVariants(ButtonVariant.LUMO_SMALL);
+            override.addThemeVariants(ButtonVariant.SMALL);
             override.addClassName("bm-override-btn");
             Button reject = new Button("Reject", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_REJECTED));
-            reject.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            reject.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.TERTIARY);
             Div actions = new Div(override, reject);
             actions.getStyle().set("display", "flex").set("gap", "8px").set("flex-shrink", "0");
             card.add(actions);
         } else {
             Button propose = new Button("Propose", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_APPROVED));
-            propose.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
+            propose.addThemeVariants(ButtonVariant.PRIMARY, ButtonVariant.SMALL);
             Button reject = new Button("Reject", e -> decide(c.employeeId(), DemandCandidateDecision.STATUS_REJECTED));
-            reject.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            reject.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.TERTIARY);
             Div actions = new Div(propose, reject);
             actions.getStyle().set("display", "flex").set("gap", "8px").set("flex-shrink", "0");
             card.add(actions);
@@ -284,8 +286,8 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
     }
 
     /**
-     * One dimension row. Collapsed text always shows; Expanded text (the raw values) is appended
-     * only when {@code expanded} is true — never shown alone, per the card spec.
+     * One dimension row. Collapsed text always shows; Expanded text (the raw values) is appended only when
+     * {@code expanded} is true — never shown alone, per the card spec.
      */
     private Div buildDimensionRow(String label, String collapsed, String expandedText, boolean expanded) {
         Span labelSpan = new Span(label);
@@ -322,23 +324,5 @@ public class ReviewWorkspaceView extends Div implements HasUrlParameter<String> 
             return;
         }
         render();
-    }
-
-    private static String initialsOf(String name) {
-        if (name == null || name.isBlank()) {
-            return "?";
-        }
-        String[] parts = name.trim().split("\\s+");
-        StringBuilder initials = new StringBuilder();
-        for (String part : parts) {
-            if (!part.isEmpty() && initials.length() < 2) {
-                initials.append(Character.toUpperCase(part.charAt(0)));
-            }
-        }
-        return initials.isEmpty() ? "?" : initials.toString();
-    }
-
-    private static String nz(String s) {
-        return s == null || s.isBlank() ? "—" : s;
     }
 }

@@ -3,13 +3,12 @@ package com.example.benchmatch.review.dto;
 import java.time.OffsetDateTime;
 
 /**
- * One candidate card's data — the "two states, four dimensions" shape from
- * demand-supply-mapping-requirements.md's Output Design section. Each dimension carries both its
- * Collapsed plain-English text (always shown) and its Expanded raw-value text (shown only once
- * the reviewer expands the card, either per-card or via "expand all") — recomputed fresh per
- * {@code DemandReviewService.workspace()} call via {@code MatchingService}'s signal methods
- * rather than read back from {@code match_candidates}, which only persists the quality CODE
- * (e.g. "core", "same_city") and the already-folded {@link #oneLiner()}, not this full text.
+ * One candidate card's data — the "two states, four dimensions" shape from demand-supply-mapping-requirements.md's
+ * Output Design section. Each dimension carries both its Collapsed plain-English text (always shown) and its Expanded
+ * raw-value text (shown only once the reviewer expands the card, either per-card or via "expand all") — recomputed
+ * fresh per {@code DemandReviewService.workspace()} call via {@code MatchingService}'s signal methods rather than read
+ * back from {@code match_candidates}, which only persists the quality CODE (e.g. "core", "same_city") and the
+ * already-folded {@link #oneLiner()}, not this full text.
  */
 public record ReviewCandidateDto(
         Long employeeId,

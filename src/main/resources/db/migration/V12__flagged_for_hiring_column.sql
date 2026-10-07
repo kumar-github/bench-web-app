@@ -19,7 +19,7 @@
 -- RefreshService's side is ever implemented, costs nothing and removes that risk entirely.
 
 ALTER TABLE demand_review_state
-    ADD COLUMN flagged_for_hiring        BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN flagged_for_hiring BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN flagged_for_hiring_reason TEXT,
     ADD COLUMN flagged_for_hiring_by     INTEGER REFERENCES users (user_id),
     ADD COLUMN flagged_for_hiring_at     TIMESTAMPTZ;

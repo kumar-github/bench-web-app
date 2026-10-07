@@ -16,21 +16,25 @@
 --      so the audit trail can record the transition.
 
 ALTER TABLE demand_candidate_decisions
-    DROP CONSTRAINT demand_candidate_decisions_status_check,
+DROP
+CONSTRAINT demand_candidate_decisions_status_check,
     ADD CONSTRAINT demand_candidate_decisions_status_check
         CHECK (status IN ('pending', 'approved', 'rejected', 'staffed', 'overridden'));
 
 ALTER TABLE demand_candidate_decisions
-    DROP CONSTRAINT demand_candidate_decisions_engine_tier_at_decision_check,
+DROP
+CONSTRAINT demand_candidate_decisions_engine_tier_at_decision_check,
     ADD CONSTRAINT demand_candidate_decisions_engine_tier_at_decision_check
         CHECK (engine_tier_at_decision IN ('Strong', 'Good', 'Weak', 'Excluded'));
 
 ALTER TABLE decision_history
-    DROP CONSTRAINT decision_history_old_status_check,
+DROP
+CONSTRAINT decision_history_old_status_check,
     ADD CONSTRAINT decision_history_old_status_check
         CHECK (old_status IN ('pending', 'approved', 'rejected', 'staffed', 'overridden'));
 
 ALTER TABLE decision_history
-    DROP CONSTRAINT decision_history_new_status_check,
+DROP
+CONSTRAINT decision_history_new_status_check,
     ADD CONSTRAINT decision_history_new_status_check
         CHECK (new_status IN ('pending', 'approved', 'rejected', 'staffed', 'overridden'));

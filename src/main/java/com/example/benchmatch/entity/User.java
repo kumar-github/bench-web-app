@@ -6,9 +6,9 @@ import java.time.OffsetDateTime;
 
 /**
  * PERSISTENT — see full_db_design.sql section 0. Minimal identity table, just enough to FK
- * decided_by/changed_by/assigned_reviewer against. No login/auth exists yet (V10 migration seeds
- * one shared placeholder row that DemandReviewService writes every decision as — see that
- * migration's comment for the plan to replace it with real per-user rows later).
+ * decided_by/changed_by/assigned_reviewer against. No login/auth exists yet (V10 migration seeds one shared placeholder
+ * row that DemandReviewService writes every decision as — see that migration's comment for the plan to replace it with
+ * real per-user rows later).
  */
 @Entity
 @Table(name = "users")

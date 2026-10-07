@@ -64,12 +64,12 @@ public class UploadView extends VerticalLayout {
                 RefreshRun run = isSupply ? refreshService.refreshSupply(staged) : refreshService.refreshDemand(staged);
                 showResult(result, run);
                 Notification success = Notification.show((isSupply ? "Supply" : "Demand") + " refresh finished: " + run.getStatus());
-                success.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                success.addThemeVariants(NotificationVariant.SUCCESS);
             } catch (Exception e) {
                 result.removeAll();
                 result.add(new Text("Refresh failed: " + e.getMessage()));
                 Notification failure = Notification.show("Refresh failed — see details below.");
-                failure.addThemeVariants(NotificationVariant.LUMO_ERROR);
+                failure.addThemeVariants(NotificationVariant.ERROR);
             } finally {
                 deleteQuietly(staged);
             }
@@ -77,7 +77,7 @@ public class UploadView extends VerticalLayout {
 
         upload.addFileRejectedListener(event -> {
             Notification n = Notification.show(event.getErrorMessage());
-            n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            n.addThemeVariants(NotificationVariant.ERROR);
         });
 
         VerticalLayout section = new VerticalLayout(new H3(title), new Div(new Text(helpText)), upload, result);

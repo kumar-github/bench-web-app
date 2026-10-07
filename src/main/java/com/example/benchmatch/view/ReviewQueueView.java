@@ -16,65 +16,48 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.data.value.ValueChangeMode;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.QueryParameters;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.router.RouterLink;
+import com.vaadin.flow.router.*;
 
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
- * Demand-side Review landing page — every actionable demand (≥1 Strong/Good candidate) that isn't
- * fully Filled yet, longest-overdue first (DemandReviewService.queue()'s Javadoc). Clicking a row
- * opens {@link ReviewWorkspaceView} for that one demand.
+ * Demand-side Review landing page — every actionable demand (≥1 Strong/Good candidate) that isn't fully Filled yet,
+ * longest-overdue first (DemandReviewService.queue()'s Javadoc). Clicking a row opens {@link ReviewWorkspaceView} for
+ * that one demand.
  * <p>
- * Rebuilt 2026-10-05 to match the approved wireframe (Main.dc.html, "Demand Queue (landing)"
- * artboard) structurally, not just a Dashboard-style card list: urgency-colored left-border rows
- * with a dot+label badge, header stat line, legend, a real search box, and classic page-based
- * pagination (20 rows/page, Prev/1/2/3/Next) — not infinite scroll or Grid virtualization. A
- * same-day earlier attempt used a Vaadin {@code Grid} for virtualized rendering once the row count
- * turned out to be in the hundreds (458 in the reporter's dataset); that solved the "very long
- * list to scroll" complaint mechanically but didn't match the mock's actual design, which never
- * intended infinite scroll at all — paging 20 at a time is both the correct UX per the mock AND
- * still only renders ~20 rows of real DOM at a time, so there's no virtualization need left once
- * paging is done properly. {@code DemandReviewService.queue()} stays a plain in-memory
- * {@code List<ReviewQueueItemDto>}; paging/search/urgency grouping all happen here, client-side,
- * over that list — fine at this row count (hundreds, not thousands), same reasoning that list's own
- * Javadoc already gives for not needing a Pageable-aware counterpart.
+ * Rebuilt 2026-10-05 to match the approved wireframe (Main.dc.html, "Demand Queue (landing)" artboard) structurally,
+ * not just a Dashboard-style card list: urgency-colored left-border rows with a dot+label badge, header stat line,
+ * legend, a real search box, and classic page-based pagination (20 rows/page, Prev/1/2/3/Next) — not infinite scroll or
+ * Grid virtualization. A same-day earlier attempt used a Vaadin {@code Grid} for virtualized rendering once the row
+ * count turned out to be in the hundreds (458 in the reporter's dataset); that solved the "very long list to scroll"
+ * complaint mechanically but didn't match the mock's actual design, which never intended infinite scroll at all —
+ * paging 20 at a time is both the correct UX per the mock AND still only renders ~20 rows of real DOM at a time, so
+ * there's no virtualization need left once paging is done properly. {@code DemandReviewService.queue()} stays a plain
+ * in-memory {@code List<ReviewQueueItemDto>}; paging/search/urgency grouping all happen here, client-side, over that
+ * list — fine at this row count (hundreds, not thousands), same reasoning that list's own Javadoc already gives for not
+ * needing a Pageable-aware counterpart.
  * <p>
- * 2026-10-06: the mock's Persona/Band/Location filter chips and "Sort: Urgency ▾" dropdown were
- * flagged as decorative (present visually, not wired to anything) in that same UI/UX pass. Wired
- * up here rather than left as-is or dropped, since the backing data (persona/band/location on
- * {@link ReviewQueueItemDto}) was already available and the filtering/sorting itself is cheap at
- * this row count — same "build it real, don't fabricate or silently drop it" call already made
- * elsewhere in this app (see {@code DashboardView}'s and {@code MainLayout}'s own mock-gap
- * comments). The "N have zero candidate" stat from that same pass is the one exception: it stays
- * a plain count, not a link, because its only real target (a Coverage Log view) genuinely doesn't
- * exist yet — see {@code DemandReviewService.noCoverageCount()}'s Javadoc.
+ * 2026-10-06: the mock's Persona/Band/Location filter chips and "Sort: Urgency ▾" dropdown were flagged as decorative
+ * (present visually, not wired to anything) in that same UI/UX pass. Wired up here rather than left as-is or dropped,
+ * since the backing data (persona/band/location on {@link ReviewQueueItemDto}) was already available and the
+ * filtering/sorting itself is cheap at this row count — same "build it real, don't fabricate or silently drop it" call
+ * already made elsewhere in this app (see {@code DashboardView}'s and {@code MainLayout}'s own mock-gap comments). The
+ * "N have zero candidate" stat from that same pass is the one exception: it stays a plain count, not a link, because
+ * its only real target (a Coverage Log view) genuinely doesn't exist yet — see
+ * {@code DemandReviewService.noCoverageCount()}'s Javadoc.
  */
 @Route(value = "review", layout = MainLayout.class)
 @PageTitle("Review")
 public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final int PAGE_SIZE = 20;
-
-    private final DemandReviewService reviewService;
-    private final List<ReviewQueueItemDto> queue;
-    private final Set<String> flaggedDemandIds;
-
     private static final String SORT_URGENCY = "Most urgent first";
     private static final String SORT_POSITIONS = "Most open positions first";
     private static final String SORT_CANDIDATES = "Fewest candidates first";
     private static final String SORT_CUSTOMER = "Customer A–Z";
-
+    private final DemandReviewService reviewService;
+    private final List<ReviewQueueItemDto> queue;
+    private final Set<String> flaggedDemandIds;
     private final TextField search = new TextField();
     private final Checkbox flaggedOnly = new Checkbox("Flagged for hiring only");
     private final Select<String> sortSelect = new Select<>();
@@ -88,11 +71,10 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private final Set<String> personaFilters = new LinkedHashSet<>();
     private final Set<String> bandFilters = new LinkedHashSet<>();
     private final Set<String> locationFilters = new LinkedHashSet<>();
-
+    private final int noCoverageCount;
     private Span flaggedCountSpan;
     private List<ReviewQueueItemDto> filtered;
     private int page = 0;
-    private final int noCoverageCount;
 
     public ReviewQueueView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
@@ -131,12 +113,11 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     }
 
     /**
-     * Reads the "page" query param (1-indexed in the URL, matching the visible page-number
-     * buttons) so a reviewer who opens a demand from, say, page 6 and comes back via
-     * {@link ReviewWorkspaceView}'s "Back to queue" link lands on page 6 again instead of being
-     * dumped back to page 1 — a real workflow cost at 247+ demands that a 2026-10-05 UI/UX pass
-     * flagged and this fixes. Runs before the view is shown, so {@code render()} only happens
-     * here, not in the constructor (query params aren't known yet at construction time).
+     * Reads the "page" query param (1-indexed in the URL, matching the visible page-number buttons) so a reviewer who
+     * opens a demand from, say, page 6 and comes back via {@link ReviewWorkspaceView}'s "Back to queue" link lands on
+     * page 6 again instead of being dumped back to page 1 — a real workflow cost at 247+ demands that a 2026-10-05
+     * UI/UX pass flagged and this fixes. Runs before the view is shown, so {@code render()} only happens here, not in
+     * the constructor (query params aren't known yet at construction time).
      */
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
@@ -190,7 +171,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         search.setPlaceholder("Search demand ID, customer, project…");
         search.setClearButtonVisible(true);
         search.setValueChangeMode(ValueChangeMode.LAZY);
-        search.addThemeVariants(TextFieldVariant.LUMO_SMALL);
+        search.addThemeVariants(TextFieldVariant.SMALL);
         search.addClassName("bm-rev-search");
         search.addValueChangeListener(e -> {
             page = 0;
@@ -211,9 +192,9 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     }
 
     /**
-     * Persona/Band/Location filter chips + the sort dropdown, built from the actual queue data
-     * (not a static mock copy) — see this class's field-level comment and styles.css's
-     * .bm-rev-filterbar comment for why these were wired up rather than left decorative.
+     * Persona/Band/Location filter chips + the sort dropdown, built from the actual queue data (not a static mock copy)
+     * — see this class's field-level comment and styles.css's .bm-rev-filterbar comment for why these were wired up
+     * rather than left decorative.
      */
     private Div buildFilterBar() {
         Div chipGroups = new Div(
@@ -417,7 +398,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private Button pageButton(String label, int targetPage, boolean enabled) {
         Button btn = new Button(label);
         btn.addClassName("bm-rev-page-btn");
-        btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        btn.addThemeVariants(ButtonVariant.TERTIARY);
         btn.setEnabled(enabled);
         btn.addClickListener(e -> {
             page = targetPage;

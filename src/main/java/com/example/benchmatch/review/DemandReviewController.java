@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Read/write API over the demand-side Review feature — same role as DemandController/
- * SupplyController play for their grids, but this one also writes (the Propose/Reject decision),
- * since Review is the first part of this app that isn't read-only.
+ * Read/write API over the demand-side Review feature — same role as DemandController/ SupplyController play for their
+ * grids, but this one also writes (the Propose/Reject decision), since Review is the first part of this app that isn't
+ * read-only.
  */
 @RestController
 @RequestMapping("/api/review")
@@ -34,7 +34,7 @@ public class DemandReviewController {
 
     @PostMapping("/demand/{demandId}/candidates/{employeeId}/decision")
     public ReviewWorkspaceDto decide(@PathVariable String demandId, @PathVariable Long employeeId,
-                                      @RequestBody DecisionRequest request) {
+                                     @RequestBody DecisionRequest request) {
         return service.decide(demandId, employeeId, request);
     }
 }

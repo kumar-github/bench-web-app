@@ -63,7 +63,7 @@ public class DemandView extends VerticalLayout {
         classificationStatusFilter.setPlaceholder("Classification status");
 
         Button search = new Button("Search", e -> refresh());
-        search.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        search.addThemeVariants(ButtonVariant.PRIMARY);
         Button clear = new Button("Clear", e -> {
             personaFilter.clear();
             subPersonaFilter.clear();
@@ -85,6 +85,7 @@ public class DemandView extends VerticalLayout {
     private Grid<DemandDto> buildGrid() {
         // See SupplyView.buildGrid's Javadoc — same fix, same reasoning: text-heavy columns get a share of
         // leftover width instead of hugging their minimum content width; short/code columns stay at flexGrow(0).
+        grid.addClassName("bm-grid");
         grid.addColumn(DemandDto::demandId).setHeader("Demand ID").setSortable(true).setSortProperty("demandId").setAutoWidth(true).setFlexGrow(0);
         grid.addColumn(DemandDto::clusterNameRaw).setHeader("Cluster").setSortable(true).setSortProperty("clusterNameRaw").setAutoWidth(true).setFlexGrow(1);
         grid.addColumn(DemandDto::location).setHeader("Location").setSortable(true).setSortProperty("location").setAutoWidth(true).setFlexGrow(1);
@@ -95,7 +96,7 @@ public class DemandView extends VerticalLayout {
         grid.addColumn(dto -> dto.masMappingMismatchFlag() ? "⚠ MAS mapping mismatch" : "")
                 .setHeader("Flag").setAutoWidth(true).setFlexGrow(0);
         grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true).setFlexGrow(0);
-        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+        grid.addThemeVariants(GridVariant.ROW_STRIPES);
         grid.setSizeFull();
         grid.setPageSize(50);
         return grid;

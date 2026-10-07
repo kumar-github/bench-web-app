@@ -5,10 +5,9 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 /**
- * PERSISTENT — full audit trail of status changes on a {@link DemandCandidateDecision}, so
- * "approved then rejected then approved again" isn't lost to last-write-wins. Written alongside
- * every status change DemandReviewService makes, never by a refresh. See full_db_design.sql
- * section 3.
+ * PERSISTENT — full audit trail of status changes on a {@link DemandCandidateDecision}, so "approved then rejected then
+ * approved again" isn't lost to last-write-wins. Written alongside every status change DemandReviewService makes, never
+ * by a refresh. See full_db_design.sql section 3.
  */
 @Entity
 @Table(name = "decision_history")

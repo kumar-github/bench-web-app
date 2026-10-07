@@ -2,6 +2,8 @@ package com.example.benchmatch.view;
 
 import com.example.benchmatch.api.SupplyQueryService;
 import com.example.benchmatch.api.dto.SupplyDto;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -73,8 +75,8 @@ public class SupplyView extends VerticalLayout {
         classificationStatusFilter.setPlaceholder("Classification status");
 
         var search = new com.vaadin.flow.component.button.Button("Search", e -> refresh());
-        search.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_PRIMARY);
-        var clear = new com.vaadin.flow.component.button.Button("Clear", e -> {
+        search.addThemeVariants(ButtonVariant.PRIMARY);
+        var clear = new Button("Clear", e -> {
             personaFilter.clear();
             subPersonaFilter.clear();
             locationFilter.clear();
@@ -97,8 +99,10 @@ public class SupplyView extends VerticalLayout {
         // no slack, which is what made this grid feel "too narrow/thin" — the text-heavy columns below now take a
         // share of whatever width is left over instead of hugging their minimum content width; the short/code
         // columns (ID, Band, Sub Band, Flag, Bench Ageing, Status) stay at flexGrow(0) since giving them extra room
-        // would just add empty padding around a couple of characters. See grid-density.css for the accompanying
-        // row-height/cell-padding bump (2026-10-07).
+        // would just add empty padding around a couple of characters. See styles.css's `.bm-grid` rule for the
+        // accompanying row-height/cell-padding bump (2026-10-07) — this class name is what scopes that rule to just
+        // this grid (and DemandView's), not Shortlist's.
+        grid.addClassName("bm-grid");
         grid.addColumn(SupplyDto::employeeId).setHeader("Employee ID").setSortable(true).setSortProperty("employeeId").setAutoWidth(true).setFlexGrow(0);
         grid.addColumn(SupplyDto::employeeName).setHeader("Name").setSortable(true).setSortProperty("employeeName").setAutoWidth(true).setFlexGrow(1);
         grid.addColumn(SupplyDto::band).setHeader("Band").setSortable(true).setSortProperty("band").setAutoWidth(true).setFlexGrow(0);
@@ -111,7 +115,7 @@ public class SupplyView extends VerticalLayout {
                 .setHeader("Flag").setAutoWidth(true).setFlexGrow(0);
         grid.addColumn(SupplyDto::benchAgeingDays).setHeader("Bench Ageing (days)").setSortable(true).setSortProperty("benchAgeingDays").setAutoWidth(true).setFlexGrow(0);
         grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true).setFlexGrow(0);
-        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+        grid.addThemeVariants(GridVariant.ROW_STRIPES);
         grid.setSizeFull();
         grid.setPageSize(50);
         return grid;

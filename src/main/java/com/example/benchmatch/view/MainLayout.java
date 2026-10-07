@@ -5,7 +5,6 @@ import com.example.benchmatch.repository.RefreshRunRepository;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.Html;
-import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
@@ -27,8 +26,8 @@ import java.util.Objects;
  * hooks to hit this mock's exact colors/spacing, so the shell here is plain {@code Div}s/ {@code RouterLink}s styled
  * from {@code styles.css} (".bm-*" classes), the same technique the mock itself uses (plain elements, inline styles).
  * <p>
- * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Review,
- * Upload, Shortlist. Review (added 2026-10-05 — demand-side queue + workspace, backed by the
+ * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Review, Upload,
+ * Shortlist. Review (added 2026-10-05 — demand-side queue + workspace, backed by the
  * demand_candidate_decisions/decision_history tables) is the first of the three former "SOON" placeholders to get a
  * real view; Coverage Log and Admin still have none, so they render as the mock's disabled "navitem-static" treatment
  * with a SOON badge. "Shortlist" has no equivalent in the mock (it predates this view) — it reuses a plain custom list
@@ -38,12 +37,16 @@ import java.util.Objects;
  * dark-mode toggle existed briefly (2026-10-02/03) but was removed entirely (2026-10-03) — this shell is light-only,
  * matching the mock, with no color-scheme switching code left anywhere in the app.
  * <p>
- * The {@code @CssImport(themeFor = "vaadin-grid")} below has nothing to do with the shell itself — it's registered
- * here only because MainLayout is guaranteed to load before any routed view, so the style is in place the first time
- * Supply/Demand's {@code <vaadin-grid>} renders. It applies application-wide to every grid (Supply, Demand, and
- * Shortlist), not just this class. See grid-density.css for why (2026-10-07 feedback that those grids felt thin).
+ * No {@code @CssImport(themeFor = ...)} is used for grid density (2026-10-07 feedback that Supply/Demand's grids felt
+ * thin) — that would require a file under {@code META-INF/frontend}, going through the Vite frontend bundler. This app
+ * (and its Aura theme — see {@code @StyleSheet(Aura.STYLESHEET)} in BenchMatchApplication) has no frontend bundle
+ * customization anywhere else; every other style here is a plain global rule in styles.css, loaded via
+ * {@code @StyleSheet}, under {@code META-INF/resources}. Grid density follows the same, simpler pattern: Aura scales a
+ * component's internal padding/gap off the inherited {@code --aura-base-size} custom property (see
+ * <a href="https://vaadin.com/docs/latest/styling/themes/aura/other">Aura: Other Properties</a>), and custom
+ * properties set on a light-DOM host element (here, {@code .bm-grid} in styles.css) are inherited into that element's
+ * own shadow DOM — no shadow-piercing mechanism needed. See styles.css's {@code .bm-grid} rule.
  */
-@CssImport(value = "./grid-density.css", themeFor = "vaadin-grid")
 public class MainLayout extends FlexLayout implements RouterLayout {
 
     private static final DateTimeFormatter LAST_REFRESHED_FORMAT =

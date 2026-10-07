@@ -30,8 +30,8 @@ import java.util.Set;
  * have an entity (built 2026-10-06 for the Review feature's "Flag for hiring" action) but that action deliberately
  * writes its OWN flagged_for_hiring/flagged_for_hiring_reason columns, not needs_reattention/reattention_reason — see
  * V12__flagged_for_hiring_column.sql and DemandReviewState's Javadoc for why those two signals were kept separate.
- * needs_reattention/reattention_reason remain exactly as V1 defined them and are still free for this step whenever
- * it's built: reclassification and hashing both happen correctly here already; only the reviewer-facing flag write is
+ * needs_reattention/reattention_reason remain exactly as V1 defined them and are still free for this step whenever it's
+ * built: reclassification and hashing both happen correctly here already; only the reviewer-facing flag write is
  * missing. - sub_capability_note / mas_mapping_note (the human-readable reason text) are NOT persisted — the schema
  * only has the boolean flags. Both are fully re-derivable on demand from the stored raw value + persona
  * (RefreshLogic.subCapabilityNote / masMappingNote), so nothing is actually lost; a future controller/view can call

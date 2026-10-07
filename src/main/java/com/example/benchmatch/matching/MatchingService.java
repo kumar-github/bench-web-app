@@ -60,9 +60,9 @@ public class MatchingService {
     private static final int MAX_WEAK_FALLBACK_PER_EMPLOYEE = 10;
     private static final int MAX_EXCLUDED_PER_EMPLOYEE = 3;
     /**
-     * Cap on the separate "below_one"/Override-eligible bucket carved out of capEmployeeRows()
-     * below — kept small for the same reason MAX_EXCLUDED_PER_EMPLOYEE is, just a sanity bound
-     * against a pathological persona/demand mix, not a tuned business number.
+     * Cap on the separate "below_one"/Override-eligible bucket carved out of capEmployeeRows() below — kept small for
+     * the same reason MAX_EXCLUDED_PER_EMPLOYEE is, just a sanity bound against a pathological persona/demand mix, not
+     * a tuned business number.
      */
     private static final int MAX_BAND_OVERRIDE_PER_EMPLOYEE = 5;
     /**
@@ -117,13 +117,12 @@ public class MatchingService {
     }
 
     /**
-     * NOT part of the build_matches.py port — a new, additive, Java-only check for the Review
-     * interaction model's Override action ("a distinct, deliberate action specifically for the
-     * 'below policy' tier (one-band-below candidates)"). Deliberately kept separate from
-     * {@link #bandSignal} itself (see that method's comment) so this new business rule can never
-     * perturb the ported quality/collapsed/expanded text that the Excel export and
-     * MatchingRunVerification's ground-truth parity check both depend on. Returns false for an
-     * unresolved band ladder position, same as bandSignal() would.
+     * NOT part of the build_matches.py port — a new, additive, Java-only check for the Review interaction model's
+     * Override action ("a distinct, deliberate action specifically for the 'below policy' tier (one-band-below
+     * candidates)"). Deliberately kept separate from {@link #bandSignal} itself (see that method's comment) so this new
+     * business rule can never perturb the ported quality/collapsed/expanded text that the Excel export and
+     * MatchingRunVerification's ground-truth parity check both depend on. Returns false for an unresolved band ladder
+     * position, same as bandSignal() would.
      */
     public boolean isOneBandBelow(String empSubBand, String demSubBand) {
         Integer ei = Engine.bandIndex(empSubBand);

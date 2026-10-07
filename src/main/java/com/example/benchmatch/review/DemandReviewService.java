@@ -1,72 +1,49 @@
 package com.example.benchmatch.review;
 
-import com.example.benchmatch.entity.DemandCandidateDecision;
-import com.example.benchmatch.entity.DemandEnriched;
-import com.example.benchmatch.entity.DecisionHistory;
-import com.example.benchmatch.entity.DemandReviewState;
-import com.example.benchmatch.entity.MatchCandidate;
-import com.example.benchmatch.entity.SupplyEnriched;
-import com.example.benchmatch.entity.User;
+import com.example.benchmatch.entity.*;
 import com.example.benchmatch.matching.MatchingService;
-import com.example.benchmatch.repository.DecisionHistoryRepository;
-import com.example.benchmatch.repository.DemandCandidateDecisionRepository;
-import com.example.benchmatch.repository.DemandEnrichedRepository;
-import com.example.benchmatch.repository.DemandReviewStateRepository;
-import com.example.benchmatch.repository.MatchCandidateRepository;
-import com.example.benchmatch.repository.SupplyEnrichedRepository;
-import com.example.benchmatch.repository.UserRepository;
-import com.example.benchmatch.review.dto.DecisionRequest;
-import com.example.benchmatch.review.dto.DemandLifecycleState;
-import com.example.benchmatch.review.dto.ReviewCandidateDto;
-import com.example.benchmatch.review.dto.ReviewQueueItemDto;
-import com.example.benchmatch.review.dto.ReviewQueueResult;
-import com.example.benchmatch.review.dto.ReviewWorkspaceDto;
+import com.example.benchmatch.repository.*;
+import com.example.benchmatch.review.dto.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Demand-side Review queue + workspace: the first entry point built against the
- * demand_candidate_decisions/decision_history PERSISTENT tables (full_db_design.sql section 3,
- * created by V1__init_schema.sql but unused by any Java code until now). Supply-side review is a
- * separate, not-yet-built entry point into these SAME rows (pair-level decisions, keyed by
- * (demand_id, employee_id) — see {@link DemandCandidateDecision}'s Javadoc) — nothing here is
- * demand-specific at the data-model level, only at the UI level.
+ * demand_candidate_decisions/decision_history PERSISTENT tables (full_db_design.sql section 3, created by
+ * V1__init_schema.sql but unused by any Java code until now). Supply-side review is a separate, not-yet-built entry
+ * point into these SAME rows (pair-level decisions, keyed by (demand_id, employee_id) — see
+ * {@link DemandCandidateDecision}'s Javadoc) — nothing here is demand-specific at the data-model level, only at the UI
+ * level.
  * <p>
- * Deliberately a straight in-memory pass over {@code findAll()}/{@code findByIsActiveTrue()}
- * results rather than per-demand queries — the same approach {@code ShortlistWorkbookService}
- * already uses at this data volume (hundreds of demands, hundreds of supply rows, a few thousand
- * match_candidates), so this isn't a new performance tradeoff for the codebase.
+ * Deliberately a straight in-memory pass over {@code findAll()}/{@code findByIsActiveTrue()} results rather than
+ * per-demand queries — the same approach {@code ShortlistWorkbookService} already uses at this data volume (hundreds of
+ * demands, hundreds of supply rows, a few thousand match_candidates), so this isn't a new performance tradeoff for the
+ * codebase.
  * <p>
- * "Propose"/"Reject" record ONLY an in-app status for now (demand_candidate_decisions.status =
- * 'approved'/'rejected') — no external system is called, per the explicit 2026-10-05 scope
- * decision ("remaining all takes place outside this app"). No collision handling between
- * concurrent reviewers either, per that same decision — last write wins, same as every other
- * table in this app.
+ * "Propose"/"Reject" record ONLY an in-app status for now (demand_candidate_decisions.status = 'approved'/'rejected') —
+ * no external system is called, per the explicit 2026-10-05 scope decision ("remaining all takes place outside this
+ * app"). No collision handling between concurrent reviewers either, per that same decision — last write wins, same as
+ * every other table in this app.
  */
 @Service
 public class DemandReviewService {
 
     /**
-     * Placeholder single reviewer identity until real auth exists — see
-     * V10__reviewer_default_user.sql's comment for the plan to replace this.
+     * Placeholder single reviewer identity until real auth exists — see V10__reviewer_default_user.sql's comment for
+     * the plan to replace this.
      */
     private static final String CURRENT_USER_EMAIL = "tag-reviewer@bench-match.local";
 
     private static final Set<String> STRONG_GOOD = Set.of("Strong", "Good");
     /**
-     * Shown as ordinary Propose/Reject tiers. The one-sub-band-below Override-eligible bucket is
-     * NOT a tier in this set — it's Excluded, surfaced separately; see {@link #isOverrideEligible}.
-     * Every other Excluded reason (two+ below, too senior, wrong sub-persona, unclassified) stays
-     * fully hidden, per demand-supply-mapping-requirements.md's "never appears on the shortlist at
-     * all" rule for hard excludes.
+     * Shown as ordinary Propose/Reject tiers. The one-sub-band-below Override-eligible bucket is NOT a tier in this set
+     * — it's Excluded, surfaced separately; see {@link #isOverrideEligible}. Every other Excluded reason (two+ below,
+     * too senior, wrong sub-persona, unclassified) stays fully hidden, per demand-supply-mapping-requirements.md's
+     * "never appears on the shortlist at all" rule for hard excludes.
      */
     private static final Set<String> SHOWN_TIERS = Set.of("Strong", "Good", "Weak");
     private static final Map<String, Integer> TIER_RANK = Map.of("Strong", 0, "Good", 1, "Weak", 2, "Excluded", 3);
@@ -81,10 +58,10 @@ public class DemandReviewService {
     private final DemandReviewStateRepository reviewStateRepository;
 
     public DemandReviewService(DemandEnrichedRepository demandRepository, SupplyEnrichedRepository supplyRepository,
-                                MatchCandidateRepository matchCandidateRepository,
-                                DemandCandidateDecisionRepository decisionRepository,
-                                DecisionHistoryRepository historyRepository, UserRepository userRepository,
-                                MatchingService matchingService, DemandReviewStateRepository reviewStateRepository) {
+                               MatchCandidateRepository matchCandidateRepository,
+                               DemandCandidateDecisionRepository decisionRepository,
+                               DecisionHistoryRepository historyRepository, UserRepository userRepository,
+                               MatchingService matchingService, DemandReviewStateRepository reviewStateRepository) {
         this.demandRepository = demandRepository;
         this.supplyRepository = supplyRepository;
         this.matchCandidateRepository = matchCandidateRepository;
@@ -96,9 +73,9 @@ public class DemandReviewService {
     }
 
     /**
-     * Actionable (≥1 Strong/Good candidate), not-yet-Filled demands, sorted longest-overdue-first —
-     * same ageing/urgency comparator ShortlistWorkbookService.generateByDemand() already uses, now
-     * applied as a grid's default sort instead of only an export's.
+     * Actionable (≥1 Strong/Good candidate), not-yet-Filled demands, sorted longest-overdue-first — same ageing/urgency
+     * comparator ShortlistWorkbookService.generateByDemand() already uses, now applied as a grid's default sort instead
+     * of only an export's.
      */
     @Transactional(readOnly = true)
     public List<ReviewQueueItemDto> queue() {
@@ -108,11 +85,10 @@ public class DemandReviewService {
     }
 
     /**
-     * Queue items + the "no coverage" count together, off ONE match_candidates.findAll() pass —
-     * see ReviewQueueResult's own Javadoc for why this exists alongside {@link #queue()} and
-     * {@link #noCoverageCount()} rather than replacing them: ReviewQueueView is the one caller
-     * that needs both every time it loads, and was previously paying for two full scans to get
-     * them (a 2026-10-06 perf finding).
+     * Queue items + the "no coverage" count together, off ONE match_candidates.findAll() pass — see ReviewQueueResult's
+     * own Javadoc for why this exists alongside {@link #queue()} and {@link #noCoverageCount()} rather than replacing
+     * them: ReviewQueueView is the one caller that needs both every time it loads, and was previously paying for two
+     * full scans to get them (a 2026-10-06 perf finding).
      */
     @Transactional(readOnly = true)
     public ReviewQueueResult queueAndCoverage() {
@@ -133,7 +109,7 @@ public class DemandReviewService {
     }
 
     private List<ReviewQueueItemDto> buildQueueItems(List<DemandEnriched> demands,
-                                                       Map<String, List<MatchCandidate>> candidatesByDemand) {
+                                                     Map<String, List<MatchCandidate>> candidatesByDemand) {
         Map<String, List<DemandCandidateDecision>> decisionsByDemand = decisionRepository.findAll().stream()
                 .collect(Collectors.groupingBy(DemandCandidateDecision::getDemandId));
         Map<String, Boolean> flaggedByDemand = reviewStateRepository.findAll().stream()
@@ -150,11 +126,10 @@ public class DemandReviewService {
     }
 
     /**
-     * Count of active, classified demands with ZERO Strong/Good candidates — the mock's "89 have
-     * zero candidate" header stat (Main.dc.html). These are exactly the demands {@link #toQueueItem}
-     * filters out of the queue entirely (not actionable from this screen) — they belong on a
-     * future "Coverage Log"/"No Coverage" view, not yet built (today's sidebar item is a disabled
-     * "SOON" placeholder), so this is currently just a count, not a link target.
+     * Count of active, classified demands with ZERO Strong/Good candidates — the mock's "89 have zero candidate" header
+     * stat (Main.dc.html). These are exactly the demands {@link #toQueueItem} filters out of the queue entirely (not
+     * actionable from this screen) — they belong on a future "Coverage Log"/"No Coverage" view, not yet built (today's
+     * sidebar item is a disabled "SOON" placeholder), so this is currently just a count, not a link target.
      */
     @Transactional(readOnly = true)
     public int noCoverageCount() {
@@ -217,15 +192,15 @@ public class DemandReviewService {
     }
 
     /**
-     * Records a Propose ("approved"), Reject ("rejected"), or Override ("overridden") decision on
-     * one (demand, employee) pair — an upsert against demand_candidate_decisions' own UNIQUE
-     * (demand_id, employee_id), a full status-change row in decision_history, then the refreshed
-     * workspace so the view can auto-advance if that was the last undecided candidate.
+     * Records a Propose ("approved"), Reject ("rejected"), or Override ("overridden") decision on one (demand,
+     * employee) pair — an upsert against demand_candidate_decisions' own UNIQUE (demand_id, employee_id), a full
+     * status-change row in decision_history, then the refreshed workspace so the view can auto-advance if that was the
+     * last undecided candidate.
      * <p>
-     * Override is validated as its OWN action, not interchangeable with Propose, per the
-     * requirements doc's "kept separate... so it's never mistaken for an ordinary approval":
-     * Override is only valid against the one-sub-band-below Excluded candidate it exists for, and
-     * Propose/Reject are only valid against an ordinarily-shown Strong/Good/Weak candidate.
+     * Override is validated as its OWN action, not interchangeable with Propose, per the requirements doc's "kept
+     * separate... so it's never mistaken for an ordinary approval": Override is only valid against the
+     * one-sub-band-below Excluded candidate it exists for, and Propose/Reject are only valid against an
+     * ordinarily-shown Strong/Good/Weak candidate.
      */
     @Transactional
     public ReviewWorkspaceDto decide(String demandId, Long employeeId, DecisionRequest request) {
@@ -297,7 +272,7 @@ public class DemandReviewService {
     }
 
     private ReviewQueueItemDto toQueueItem(DemandEnriched d, List<MatchCandidate> candidates,
-                                            List<DemandCandidateDecision> decisions, boolean flaggedForHiring) {
+                                           List<DemandCandidateDecision> decisions, boolean flaggedForHiring) {
         List<MatchCandidate> strongGood = candidates.stream().filter(c -> STRONG_GOOD.contains(c.getOverallTier())).toList();
         if (strongGood.isEmpty()) {
             return null; // not actionable — belongs on a future "No Coverage"/Coverage Log view, not here
@@ -333,11 +308,10 @@ public class DemandReviewService {
     }
 
     /**
-     * The Review queue's "Flag for hiring" action on an EXHAUSTED demand — writes
-     * demand_review_state's own flagged_for_hiring/flagged_for_hiring_reason/_by/_at columns (added
-     * by V12__flagged_for_hiring_column.sql, split out from needs_reattention/reattention_reason —
-     * see {@link DemandReviewState}'s Javadoc for why). Idempotent upsert, same pattern
-     * {@link #decide} already uses against demand_candidate_decisions.
+     * The Review queue's "Flag for hiring" action on an EXHAUSTED demand — writes demand_review_state's own
+     * flagged_for_hiring/flagged_for_hiring_reason/_by/_at columns (added by V12__flagged_for_hiring_column.sql, split
+     * out from needs_reattention/reattention_reason — see {@link DemandReviewState}'s Javadoc for why). Idempotent
+     * upsert, same pattern {@link #decide} already uses against demand_candidate_decisions.
      */
     @Transactional
     public void flagForHiring(String demandId) {
@@ -351,7 +325,7 @@ public class DemandReviewService {
     }
 
     private DemandLifecycleState lifecycleOf(DemandEnriched d, List<MatchCandidate> candidates,
-                                              java.util.Collection<DemandCandidateDecision> decisions) {
+                                             java.util.Collection<DemandCandidateDecision> decisions) {
         List<MatchCandidate> strongGood = candidates.stream().filter(c -> STRONG_GOOD.contains(c.getOverallTier())).toList();
         int totalPositions = d.getBalancePositions() == null ? 0 : d.getBalancePositions();
         int approvedCount = (int) decisions.stream().filter(dec -> DemandCandidateDecision.STATUS_APPROVED.equals(dec.getStatus())).count();
@@ -373,12 +347,11 @@ public class DemandReviewService {
     }
 
     /**
-     * True only for the one-sub-band-below Override-eligible case. Recomputed from the raw
-     * sub-band values rather than read off {@code c.getBandSignal()} — match_candidates.band_signal
-     * stores the ported "below" quality for ANY amount below (see MatchingService.bandSignal()'s
-     * own comment), so the one-below distinction isn't persisted there; MatchingService.isOneBandBelow()
-     * is the one source of truth for it. Returns false (not eligible) if either side's row has
-     * since gone missing.
+     * True only for the one-sub-band-below Override-eligible case. Recomputed from the raw sub-band values rather than
+     * read off {@code c.getBandSignal()} — match_candidates.band_signal stores the ported "below" quality for ANY
+     * amount below (see MatchingService.bandSignal()'s own comment), so the one-below distinction isn't persisted
+     * there; MatchingService.isOneBandBelow() is the one source of truth for it. Returns false (not eligible) if either
+     * side's row has since gone missing.
      */
     private boolean isOverrideEligible(MatchCandidate c, SupplyEnriched supply, DemandEnriched demand) {
         if (!"Excluded".equals(c.getOverallTier()) || supply == null || demand == null) {
@@ -388,16 +361,15 @@ public class DemandReviewService {
     }
 
     /**
-     * Recomputes all four signals fresh against MatchingService — match_candidates only persists
-     * the quality CODE + the already-folded one_liner (see ReviewCandidateDto's own Javadoc), not
-     * the Collapsed/Expanded text pairs the four-dimension card needs. Mirrors the pattern
-     * MatchingRunService/ShortlistWorkbookService already use (including their own private
-     * toClassificationResult() duplicates) — a third copy here follows that same established
-     * precedent rather than extracting shared code, per this codebase's own stated tradeoff
-     * (independently readable classes over DRY at this size).
+     * Recomputes all four signals fresh against MatchingService — match_candidates only persists the quality CODE + the
+     * already-folded one_liner (see ReviewCandidateDto's own Javadoc), not the Collapsed/Expanded text pairs the
+     * four-dimension card needs. Mirrors the pattern MatchingRunService/ShortlistWorkbookService already use (including
+     * their own private toClassificationResult() duplicates) — a third copy here follows that same established
+     * precedent rather than extracting shared code, per this codebase's own stated tradeoff (independently readable
+     * classes over DRY at this size).
      */
     private ReviewCandidateDto toCandidateDto(MatchCandidate c, DemandEnriched demand, SupplyEnriched supply,
-                                               DemandCandidateDecision decision, Map<Integer, String> userNames) {
+                                              DemandCandidateDecision decision, Map<Integer, String> userNames) {
         if (supply == null) {
             // Supply row went inactive/was removed since the last matching run — match_candidates
             // is re-derivable but may be briefly stale; show a bare placeholder rather than fail

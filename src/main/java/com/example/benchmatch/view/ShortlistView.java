@@ -54,7 +54,7 @@ public class ShortlistView extends VerticalLayout {
         Anchor employeeDownload = new Anchor(employeeResource, "");
         employeeDownload.getElement().setAttribute("download", true);
         Button employeeGenerateButton = new Button("Generate & Download");
-        employeeGenerateButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        employeeGenerateButton.addThemeVariants(ButtonVariant.PRIMARY);
         employeeDownload.add(employeeGenerateButton);
 
         add(employeeTitle, employeeHelpText, employeeDownload, new Hr());
@@ -92,7 +92,7 @@ public class ShortlistView extends VerticalLayout {
             demandDownloadAnchor.setHref(resource);
             demandDownloadAnchor.getElement().executeJs("this.click()");
         });
-        demandGenerateButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        demandGenerateButton.addThemeVariants(ButtonVariant.PRIMARY);
 
         HorizontalLayout demandControls = new HorizontalLayout(demandLimitField, demandGenerateButton);
         demandControls.setAlignItems(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.BASELINE);

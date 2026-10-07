@@ -50,12 +50,12 @@ import java.util.stream.Collectors;
  * delete removed the other's insert, because neither had committed yet when the other's delete ran. Net result:
  * match_candidates ended up holding TWO runs' worth of rows simultaneously, violating the "fully truncated and
  * rewritten every run" invariant this class's own Javadoc states. The fix is the advisory lock below — it stops a
- * second, overlapping {@link #runMatching()} call from ever reaching the delete/insert section while one is already
- * in flight, using a Postgres TRANSACTION-level advisory lock ({@code pg_try_advisory_xact_lock}): it's acquired
- * inside this method's own transaction and auto-releases on commit or rollback (no manual unlock needed, and no
- * long-held lock surviving on a pooled connection after the method returns — a plain session-level advisory lock
- * would have that problem since connection-pooled "sessions" are reused across requests). A concurrent second call
- * fails fast with a clear error instead of silently racing.
+ * second, overlapping {@link #runMatching()} call from ever reaching the delete/insert section while one is already in
+ * flight, using a Postgres TRANSACTION-level advisory lock ({@code pg_try_advisory_xact_lock}): it's acquired inside
+ * this method's own transaction and auto-releases on commit or rollback (no manual unlock needed, and no long-held lock
+ * surviving on a pooled connection after the method returns — a plain session-level advisory lock would have that
+ * problem since connection-pooled "sessions" are reused across requests). A concurrent second call fails fast with a
+ * clear error instead of silently racing.
  */
 @Service
 public class MatchingRunService {
@@ -179,13 +179,12 @@ public class MatchingRunService {
     }
 
     /**
-     * {@code pg_try_advisory_xact_lock} (not the plain {@code pg_try_advisory_lock}) specifically —
-     * the xact variant is scoped to the CURRENT transaction and releases automatically on commit or
-     * rollback, which matters because this method runs under a connection-pooled DataSource: a plain
-     * session-level lock is tied to the physical connection, not to this one logical call, so it can
-     * outlive this method and block a future, unrelated request that happens to reuse the same pooled
-     * connection. Returns false (lock not acquired) immediately rather than blocking, so a second,
-     * overlapping call fails fast instead of queueing up behind the first.
+     * {@code pg_try_advisory_xact_lock} (not the plain {@code pg_try_advisory_lock}) specifically — the xact variant is
+     * scoped to the CURRENT transaction and releases automatically on commit or rollback, which matters because this
+     * method runs under a connection-pooled DataSource: a plain session-level lock is tied to the physical connection,
+     * not to this one logical call, so it can outlive this method and block a future, unrelated request that happens to
+     * reuse the same pooled connection. Returns false (lock not acquired) immediately rather than blocking, so a
+     * second, overlapping call fails fast instead of queueing up behind the first.
      */
     private boolean tryAcquireMatchingRunLock() {
         Object acquired = entityManager

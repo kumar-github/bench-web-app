@@ -5,15 +5,15 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 /**
- * PERSISTENT — one row per (demand, employee) pair a reviewer has actually acted on. This is NOT
- * the engine's proposed candidate list (that's {@link MatchCandidate}, re-derivable) — it's the
- * subset a human has looked at and made a call on, so a refresh/matching run must never write to
- * this table. See full_db_design.sql section 3 for the full rationale.
+ * PERSISTENT — one row per (demand, employee) pair a reviewer has actually acted on. This is NOT the engine's proposed
+ * candidate list (that's {@link MatchCandidate}, re-derivable) — it's the subset a human has looked at and made a call
+ * on, so a refresh/matching run must never write to this table. See full_db_design.sql section 3 for the full
+ * rationale.
  * <p>
- * Pair-level, not side-level: this is the ONE shared decision for an (employeeId, demandId) pair,
- * deliberately not duplicated per entry point — a supply-side review screen and this demand-side
- * one both read/write the same row via {@code UNIQUE (demand_id, employee_id)}, upserting rather
- * than blind-inserting. Only the demand-side entry point (DemandReviewService) is built so far.
+ * Pair-level, not side-level: this is the ONE shared decision for an (employeeId, demandId) pair, deliberately not
+ * duplicated per entry point — a supply-side review screen and this demand-side one both read/write the same row via
+ * {@code UNIQUE (demand_id, employee_id)}, upserting rather than blind-inserting. Only the demand-side entry point
+ * (DemandReviewService) is built so far.
  */
 @Entity
 @Table(name = "demand_candidate_decisions")
@@ -24,11 +24,11 @@ public class DemandCandidateDecision {
     public static final String STATUS_REJECTED = "rejected";
     public static final String STATUS_STAFFED = "staffed";
     /**
-     * The "Override" action (requirements doc's Review interaction model) — deliberately distinct
-     * from {@link #STATUS_APPROVED} so it's never mistaken for an ordinary Propose. Only valid for
-     * a candidate whose engine tier at decision time was "Excluded" for being exactly one sub-band
-     * below the demand's band (see MatchingService.bandSignal()'s "below_one" quality and
-     * DemandReviewService's OVERRIDE_ELIGIBLE_BAND_QUALITY) — added by V11__override_decision_status.sql.
+     * The "Override" action (requirements doc's Review interaction model) — deliberately distinct from
+     * {@link #STATUS_APPROVED} so it's never mistaken for an ordinary Propose. Only valid for a candidate whose engine
+     * tier at decision time was "Excluded" for being exactly one sub-band below the demand's band (see
+     * MatchingService.bandSignal()'s "below_one" quality and DemandReviewService's OVERRIDE_ELIGIBLE_BAND_QUALITY) —
+     * added by V11__override_decision_status.sql.
      */
     public static final String STATUS_OVERRIDDEN = "overridden";
 
@@ -46,8 +46,8 @@ public class DemandCandidateDecision {
     private Long employeeId;
 
     /**
-     * Strong/Good/Weak snapshot at decision time — so a later matching run reclassifying this pair
-     * doesn't silently rewrite the history of what the reviewer actually saw when they decided.
+     * Strong/Good/Weak snapshot at decision time — so a later matching run reclassifying this pair doesn't silently
+     * rewrite the history of what the reviewer actually saw when they decided.
      */
     @Column(name = "engine_tier_at_decision")
     private String engineTierAtDecision;
