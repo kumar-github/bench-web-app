@@ -4,6 +4,7 @@ import com.example.benchmatch.api.SupplyQueryService;
 import com.example.benchmatch.api.dto.SupplyDto;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -92,18 +93,25 @@ public class SupplyView extends VerticalLayout {
     }
 
     private Grid<SupplyDto> buildGrid() {
-        grid.addColumn(SupplyDto::employeeId).setHeader("Employee ID").setSortable(true).setSortProperty("employeeId").setAutoWidth(true);
-        grid.addColumn(SupplyDto::employeeName).setHeader("Name").setSortable(true).setSortProperty("employeeName").setAutoWidth(true);
-        grid.addColumn(SupplyDto::band).setHeader("Band").setSortable(true).setSortProperty("band").setAutoWidth(true);
-        grid.addColumn(SupplyDto::subBand).setHeader("Sub Band").setSortable(true).setSortProperty("subBand").setAutoWidth(true);
-        grid.addColumn(SupplyDto::location).setHeader("Location").setSortable(true).setSortProperty("location").setAutoWidth(true);
-        grid.addColumn(SupplyDto::persona).setHeader("Persona").setSortable(true).setSortProperty("persona.name").setAutoWidth(true);
-        grid.addColumn(SupplyDto::subPersona).setHeader("Sub-persona").setSortable(true).setSortProperty("subPersona.name").setAutoWidth(true);
-        grid.addColumn(SupplyDto::classificationStatus).setHeader("Classification").setSortable(true).setSortProperty("classificationStatus").setAutoWidth(true);
+        // flexGrow(0) (the default alongside setAutoWidth(true)) packs every column to its exact content width with
+        // no slack, which is what made this grid feel "too narrow/thin" — the text-heavy columns below now take a
+        // share of whatever width is left over instead of hugging their minimum content width; the short/code
+        // columns (ID, Band, Sub Band, Flag, Bench Ageing, Status) stay at flexGrow(0) since giving them extra room
+        // would just add empty padding around a couple of characters. See grid-density.css for the accompanying
+        // row-height/cell-padding bump (2026-10-07).
+        grid.addColumn(SupplyDto::employeeId).setHeader("Employee ID").setSortable(true).setSortProperty("employeeId").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(SupplyDto::employeeName).setHeader("Name").setSortable(true).setSortProperty("employeeName").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(SupplyDto::band).setHeader("Band").setSortable(true).setSortProperty("band").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(SupplyDto::subBand).setHeader("Sub Band").setSortable(true).setSortProperty("subBand").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(SupplyDto::location).setHeader("Location").setSortable(true).setSortProperty("location").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(SupplyDto::persona).setHeader("Persona").setSortable(true).setSortProperty("persona.name").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(SupplyDto::subPersona).setHeader("Sub-persona").setSortable(true).setSortProperty("subPersona.name").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(SupplyDto::classificationStatus).setHeader("Classification").setSortable(true).setSortProperty("classificationStatus").setAutoWidth(true).setFlexGrow(1);
         grid.addColumn(dto -> dto.subCapabilityMismatchFlag() ? "⚠ Sub-capability mismatch" : "")
-                .setHeader("Flag").setAutoWidth(true);
-        grid.addColumn(SupplyDto::benchAgeingDays).setHeader("Bench Ageing (days)").setSortable(true).setSortProperty("benchAgeingDays").setAutoWidth(true);
-        grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true);
+                .setHeader("Flag").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(SupplyDto::benchAgeingDays).setHeader("Bench Ageing (days)").setSortable(true).setSortProperty("benchAgeingDays").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true).setFlexGrow(0);
+        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
         grid.setSizeFull();
         grid.setPageSize(50);
         return grid;

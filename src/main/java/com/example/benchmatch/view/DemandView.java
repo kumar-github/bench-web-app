@@ -6,6 +6,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -82,16 +83,19 @@ public class DemandView extends VerticalLayout {
     }
 
     private Grid<DemandDto> buildGrid() {
-        grid.addColumn(DemandDto::demandId).setHeader("Demand ID").setSortable(true).setSortProperty("demandId").setAutoWidth(true);
-        grid.addColumn(DemandDto::clusterNameRaw).setHeader("Cluster").setSortable(true).setSortProperty("clusterNameRaw").setAutoWidth(true);
-        grid.addColumn(DemandDto::location).setHeader("Location").setSortable(true).setSortProperty("location").setAutoWidth(true);
-        grid.addColumn(DemandDto::band).setHeader("Band").setSortable(true).setSortProperty("band").setAutoWidth(true);
-        grid.addColumn(DemandDto::persona).setHeader("Persona").setSortable(true).setSortProperty("persona.name").setAutoWidth(true);
-        grid.addColumn(DemandDto::subPersona).setHeader("Sub-persona").setSortable(true).setSortProperty("subPersona.name").setAutoWidth(true);
-        grid.addColumn(DemandDto::classificationStatus).setHeader("Classification").setSortable(true).setSortProperty("classificationStatus").setAutoWidth(true);
+        // See SupplyView.buildGrid's Javadoc — same fix, same reasoning: text-heavy columns get a share of
+        // leftover width instead of hugging their minimum content width; short/code columns stay at flexGrow(0).
+        grid.addColumn(DemandDto::demandId).setHeader("Demand ID").setSortable(true).setSortProperty("demandId").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(DemandDto::clusterNameRaw).setHeader("Cluster").setSortable(true).setSortProperty("clusterNameRaw").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(DemandDto::location).setHeader("Location").setSortable(true).setSortProperty("location").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(DemandDto::band).setHeader("Band").setSortable(true).setSortProperty("band").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(DemandDto::persona).setHeader("Persona").setSortable(true).setSortProperty("persona.name").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(DemandDto::subPersona).setHeader("Sub-persona").setSortable(true).setSortProperty("subPersona.name").setAutoWidth(true).setFlexGrow(1);
+        grid.addColumn(DemandDto::classificationStatus).setHeader("Classification").setSortable(true).setSortProperty("classificationStatus").setAutoWidth(true).setFlexGrow(1);
         grid.addColumn(dto -> dto.masMappingMismatchFlag() ? "⚠ MAS mapping mismatch" : "")
-                .setHeader("Flag").setAutoWidth(true);
-        grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true);
+                .setHeader("Flag").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(dto -> dto.isActive() ? "Active" : "Inactive").setHeader("Status").setAutoWidth(true).setFlexGrow(0);
+        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
         grid.setSizeFull();
         grid.setPageSize(50);
         return grid;

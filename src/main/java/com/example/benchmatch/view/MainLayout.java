@@ -5,6 +5,7 @@ import com.example.benchmatch.repository.RefreshRunRepository;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
@@ -36,7 +37,13 @@ import java.util.Objects;
  * The mock itself is a fixed light palette with a permanently-dark sidebar and no dark-mode variant of its own. A
  * dark-mode toggle existed briefly (2026-10-02/03) but was removed entirely (2026-10-03) — this shell is light-only,
  * matching the mock, with no color-scheme switching code left anywhere in the app.
+ * <p>
+ * The {@code @CssImport(themeFor = "vaadin-grid")} below has nothing to do with the shell itself — it's registered
+ * here only because MainLayout is guaranteed to load before any routed view, so the style is in place the first time
+ * Supply/Demand's {@code <vaadin-grid>} renders. It applies application-wide to every grid (Supply, Demand, and
+ * Shortlist), not just this class. See grid-density.css for why (2026-10-07 feedback that those grids felt thin).
  */
+@CssImport(value = "./grid-density.css", themeFor = "vaadin-grid")
 public class MainLayout extends FlexLayout implements RouterLayout {
 
     private static final DateTimeFormatter LAST_REFRESHED_FORMAT =

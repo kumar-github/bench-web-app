@@ -94,7 +94,7 @@
 
 .bm-shell {
   display: flex;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: "Inter", sans-serif;
   /* No `color` here on purpose — see the file header comment. Content outside `.bm-dash`
        (Supply/Demand/Upload/Shortlist) inherits Aura's own adaptive text color instead of a
        hardcoded ink that would stay dark even when the background goes dark. */
@@ -144,7 +144,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 800;
   font-size: 14px;
   /* color: var(--bm-navy); */
@@ -152,7 +152,7 @@
 }
 
 .bm-brand {
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 700;
   font-size: 16px;
   color: #ffffff;
@@ -257,7 +257,7 @@
 }
 
 .bm-header-title {
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 700;
   font-size: 20px;
   /* Explicit now that .bm-shell no longer sets a blanket `color` — see file header comment. */
@@ -294,7 +294,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 700;
   font-size: 13px;
   /* color: var(--bm-navy); */
@@ -368,7 +368,7 @@
 
 .bm-kpi-value {
   display: block;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 800;
   font-size: 30px;
   margin-top: 6px;
@@ -404,9 +404,9 @@
   box-shadow: var(--bm-card-shadow);
 }
 
-/* "Your queue"-style header: big Manrope title, used only for the needs-attention card. */
+/* "Your queue"-style header: big Plus Jakarta Sans title, used only for the needs-attention card. */
 .bm-card-title-lg {
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 700;
   font-size: 16px;
 }
@@ -438,7 +438,7 @@
   font-size: 13px;
   padding: 9px 16px;
   border-radius: 8px;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   text-decoration: none;
 }
 
@@ -482,7 +482,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 700;
   font-size: 11px;
   flex-shrink: 0;

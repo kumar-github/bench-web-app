@@ -15,10 +15,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  */
 @SpringBootApplication
 @StyleSheet(Aura.STYLESHEET)
-// Brand fonts for the dashboard shell (Manrope for headings/numbers, IBM Plex Sans for body) —
-// @StyleSheet supports an absolute https:// URL directly, per
+// Brand fonts for the dashboard shell (Plus Jakarta Sans for headings/numbers, Inter for body) —
+// swapped 2026-10-07 from Manrope/IBM Plex Sans for a cleaner, more polished look; same mechanism
+// as before — @StyleSheet supports an absolute https:// URL directly, per
 // https://vaadin.com/docs/latest/styling/stylesheets
-@StyleSheet("https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap")
+@StyleSheet("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&display=swap")
 @StyleSheet("styles.css") // Your custom styles
 @Push
 public class BenchMatchApplication implements AppShellConfigurator {
