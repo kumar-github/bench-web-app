@@ -16,7 +16,7 @@ import java.util.Objects;
 
 /**
  * Shared read/filter logic over supply_enriched, extracted out of SupplyController (2026-09-30, task #18) so the new
- * Vaadin SupplyView can call the exact same filtering the REST API uses, in-process, rather than duplicating it or
+ * Vaadin SupplyDemandView (Supply tab) can call the exact same filtering the REST API uses, in-process, rather than duplicating it or
  * routing through HTTP to itself — per this app's architecture (Vaadin views and REST controllers both call the service
  * layer; see BenchMatchApplication's Javadoc).
  * <p>
@@ -35,7 +35,7 @@ public class SupplyQueryService {
     /**
      * Full, unpaged list — kept exactly as it was for the two callers that genuinely need every row: the REST API
      * (SupplyController, an existing external contract) and anything reading supply_enriched outside the grid. NOT used
-     * by SupplyView any more (see {@link #page}) — this is the method that made the Supply grid slow, because every
+     * by SupplyDemandView any more (see {@link #page}) — this is the method that made the Supply grid slow, because every
      * refresh pulled the entire table into memory just to display one page of it.
      */
     @Transactional(readOnly = true)
@@ -51,10 +51,10 @@ public class SupplyQueryService {
     }
 
     /**
-     * Paged counterpart of {@link #list}, added 2026-10-03 to fix SupplyView's grid being "very slow" with every record
+     * Paged counterpart of {@link #list}, added 2026-10-03 to fix the Supply grid being "very slow" with every record
      * on screen (reported the same day as the demand-centric export work). Pushes both the filtering AND the paging
      * down into the database via a {@code Specification} + {@code Pageable} — only one page's worth of rows (default
-     * 50, see SupplyView) is ever loaded into the JVM or serialized to the browser for a given fetch, instead of the
+     * 50, see SupplyDemandView) is ever loaded into the JVM or serialized to the browser for a given fetch, instead of the
      * full supply_enriched table every time a filter changes or the grid scrolls.
      * <p>
      * Same filter semantics as {@link #list} (persona/subPersona/classificationStatus case-insensitive exact match,

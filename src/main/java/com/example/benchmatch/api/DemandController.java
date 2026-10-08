@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * Read API over demand_enriched. Same in-memory-filtering caveat as SupplyController, and same delegation to a shared
- * query service ({@link DemandQueryService}) so the Vaadin DemandView reuses this filtering in-process.
+ * query service ({@link DemandQueryService}) so the Vaadin SupplyDemandView (Demand tab) reuses this filtering in-process.
  */
 @RestController
 @RequestMapping("/api/demand")

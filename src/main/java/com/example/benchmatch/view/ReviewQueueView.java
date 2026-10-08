@@ -5,6 +5,8 @@ import com.example.benchmatch.review.dto.DemandLifecycleState;
 import com.example.benchmatch.review.dto.ReviewQueueItemDto;
 import com.example.benchmatch.review.dto.ReviewQueueResult;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.Shortcuts;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -65,9 +67,10 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private final Div paginationContainer = new Div();
 
     // Multi-select-within-group, AND-across-groups chip filters (Persona/Band/Location) — see
-    // styles.css's .bm-rev-filterbar comment for why these exist now instead of the mock's static
-    // decoration. Populated from the actual queue's distinct values in buildFilterBar(), not a
-    // fixed list, so a chip never offers a value that would return zero rows.
+    // styles.css's .bm-rev-filters-panel comment for why these exist now instead of the mock's
+    // static decoration. Populated from the actual queue's distinct values in
+    // refreshFilterChipGroups(), not a fixed list, so a chip never offers a value that would
+    // return zero rows.
     private final Set<String> personaFilters = new LinkedHashSet<>();
     private final Set<String> bandFilters = new LinkedHashSet<>();
     private final Set<String> locationFilters = new LinkedHashSet<>();
@@ -75,6 +78,18 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
     private Span flaggedCountSpan;
     private List<ReviewQueueItemDto> filtered;
     private int page = 0;
+
+    // 2026-10-07 header-declutter decision — see styles.css's .bm-rev-filters-panel comment for
+    // the full before/after reasoning (mocked up as "Idea A" against a per-facet-dropdown
+    // alternative before landing here). Persona/Band/Location move out of three permanently-open
+    // chip rows and into one collapsible "Filters" popover; search/flagged-only/Filters/sort all
+    // join one toolbar row instead of two. Location stays a plain chip list for now, same as
+    // Persona/Band — a searchable multi-select was mocked up too but deliberately deferred until
+    // the number of distinct locations actually grows enough to matter.
+    private final Div filtersPanel = new Div();
+    private final Div filterChipGroups = new Div();
+    private final Span filtersCountBadge = new Span();
+    private boolean filtersOpen = false;
 
     public ReviewQueueView(DemandReviewService reviewService) {
         this.reviewService = reviewService;
@@ -98,9 +113,7 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         setSpacing(true);
 
         add(buildHeader());
-        add(buildToolbar());
-        add(buildFilterBar());
-        add(buildLegend());
+        add(buildToolbarRow());
 
         rowsContainer.addClassName("bm-rev-rows");
         add(rowsContainer);
@@ -158,6 +171,15 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         Div stats = new Div(total, overdueSpan, dueSoonSpan, noCoverageSpan, flaggedCountSpan);
         stats.addClassName("bm-rev-stats");
 
+        // 2026-10-07: folded onto the same line as the stats instead of its own row below the
+        // toolbar — it was a second, separate row that only restated the three urgency states the
+        // stats line (and every row's own colored dot) already carry, just in a different visual
+        // language (dots vs. colored text). margin-left: auto pushes it to the line's right edge
+        // when there's room and lets it wrap below on narrow widths, same as the other stats do.
+        Div legend = buildLegend();
+        legend.getStyle().set("margin-left", "auto");
+        stats.add(legend);
+
         Div header = new Div(title, stats);
         header.addClassName("bm-rev-header");
         return header;
@@ -167,7 +189,12 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         flaggedCountSpan.setText(flaggedDemandIds.size() + " flagged for hiring");
     }
 
-    private Div buildToolbar() {
+    /**
+     * Search, "Flagged only", the Filters popover trigger, and the sort dropdown — one toolbar row
+     * instead of the two the mock originally had (a search row, then a separate chips+sort row).
+     * See the class-level 2026-10-07 field comment for why.
+     */
+    private Div buildToolbarRow() {
         search.setPlaceholder("Search demand ID, customer, project…");
         search.setClearButtonVisible(true);
         search.setValueChangeMode(ValueChangeMode.LAZY);
@@ -186,24 +213,6 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
             render();
         });
 
-        Div toolbar = new Div(search, flaggedOnly);
-        toolbar.addClassName("bm-rev-toolbar");
-        return toolbar;
-    }
-
-    /**
-     * Persona/Band/Location filter chips + the sort dropdown, built from the actual queue data (not a static mock copy)
-     * — see this class's field-level comment and styles.css's .bm-rev-filterbar comment for why these were wired up
-     * rather than left decorative.
-     */
-    private Div buildFilterBar() {
-        Div chipGroups = new Div(
-                chipGroup("Persona", distinctValues(ReviewQueueItemDto::persona), personaFilters),
-                chipGroup("Band", distinctValues(ReviewQueueItemDto::band), bandFilters),
-                chipGroup("Location", distinctValues(ReviewQueueItemDto::location), locationFilters)
-        );
-        chipGroups.addClassName("bm-rev-chip-groups");
-
         sortSelect.setItems(SORT_URGENCY, SORT_POSITIONS, SORT_CANDIDATES, SORT_CUSTOMER);
         sortSelect.setValue(SORT_URGENCY);
         sortSelect.addClassName("bm-rev-sort");
@@ -213,9 +222,109 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
             render();
         });
 
-        Div filterBar = new Div(chipGroups, sortSelect);
-        filterBar.addClassName("bm-rev-filterbar");
-        return filterBar;
+        Div toolbar = new Div(search, flaggedOnly, buildFiltersControl(), sortSelect);
+        toolbar.addClassName("bm-rev-toolbar-row");
+        return toolbar;
+    }
+
+    /**
+     * Persona/Band/Location filter chips, built from the actual queue data (not a static mock
+     * copy) — see this class's field-level comment and styles.css's .bm-rev-filters-panel comment
+     * for why these were wired up rather than left decorative, and why they now live in a
+     * collapsed-by-default popover instead of three permanently-open rows.
+     */
+    private Div buildFiltersControl() {
+        filterChipGroups.addClassName("bm-rev-filters-panel-groups");
+        refreshFilterChipGroups();
+
+        Button clearAll = new Button("Clear all", e -> {
+            personaFilters.clear();
+            bandFilters.clear();
+            locationFilters.clear();
+            page = 0;
+            applyFilters();
+            render();
+            refreshFilterChipGroups();
+            refreshFiltersCount();
+        });
+        clearAll.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.TERTIARY);
+
+        Button done = new Button("Done", e -> {
+            filtersOpen = false;
+            filtersPanel.setVisible(false);
+        });
+        done.addThemeVariants(ButtonVariant.SMALL, ButtonVariant.PRIMARY);
+
+        Div actions = new Div(clearAll, done);
+        actions.addClassName("bm-rev-filters-panel-actions");
+
+        filtersPanel.add(filterChipGroups, actions);
+        filtersPanel.addClassName("bm-rev-filters-panel");
+        filtersPanel.setVisible(false);
+
+        filtersCountBadge.addClassName("bm-rev-filters-count");
+        refreshFiltersCount();
+
+        // Div, not Button — this codebase already uses a clickable Div for exactly this (see
+        // ReviewWorkspaceView.buildCandidateCard()'s nameLine), and it sidesteps having to compose
+        // a label + trailing count badge inside a single Button.
+        Div filtersBtn = new Div(new Span("Filters"), filtersCountBadge, new Span("▾"));
+        filtersBtn.addClassName("bm-rev-filters-btn");
+        filtersBtn.addClickListener(e -> {
+            filtersOpen = !filtersOpen;
+            filtersPanel.setVisible(filtersOpen);
+        });
+
+        Div wrap = new Div(filtersBtn, filtersPanel);
+        wrap.addClassName("bm-rev-filters-wrap");
+
+        // 2026-10-08 fix: the popover used to only close via the "Filters" toggle or "Done" — no
+        // outside-click or Esc handling existed at all. Esc is handled server-side via Vaadin's own
+        // Shortcuts API (no JS needed). Outside-click has no Flow-native equivalent, so a document
+        // 'click' listener is attached in JS once this element is attached to the page; it checks
+        // whether the click landed inside `wrap` (covers both the button and the panel, so clicking
+        // the Filters button itself to toggle isn't mistaken for an "outside" click) and, if not,
+        // dispatches a plain DOM CustomEvent that a normal Flow DomListener picks back up server-side
+        // — avoids a bespoke @ClientCallable just to get one boolean back. The document listener is
+        // removed on detach so repeat visits to /review (a fresh ReviewQueueView each time) don't
+        // pile up duplicate handlers on the one shared `document`.
+        wrap.addAttachListener(attachEvent -> wrap.getElement().executeJs(
+                "const wrap = this;"
+                        + "const handler = function(e) { if (!wrap.contains(e.target)) { wrap.dispatchEvent(new CustomEvent('bm-filters-close')); } };"
+                        + "document.addEventListener('click', handler);"
+                        + "wrap.__bmFiltersCloseHandler = handler;"));
+        wrap.addDetachListener(detachEvent -> wrap.getElement().executeJs(
+                "if (this.__bmFiltersCloseHandler) { document.removeEventListener('click', this.__bmFiltersCloseHandler); this.__bmFiltersCloseHandler = null; }"));
+        wrap.getElement().addEventListener("bm-filters-close", e -> closeFiltersPopover());
+
+        Shortcuts.addShortcutListener(this, this::closeFiltersPopover, Key.ESCAPE);
+
+        return wrap;
+    }
+
+    private void closeFiltersPopover() {
+        if (filtersOpen) {
+            filtersOpen = false;
+            filtersPanel.setVisible(false);
+        }
+    }
+
+    // Full rebuild of the three chip groups — needed after "Clear all" (several chips' active
+    // state change at once) and on first build. An individual chip click still does its own
+    // cheap in-place class toggle (see chipGroup()'s listener) rather than going through here.
+    private void refreshFilterChipGroups() {
+        filterChipGroups.removeAll();
+        filterChipGroups.add(
+                chipGroup("Persona", distinctValues(ReviewQueueItemDto::persona), personaFilters),
+                chipGroup("Band", distinctValues(ReviewQueueItemDto::band), bandFilters),
+                chipGroup("Location", distinctValues(ReviewQueueItemDto::location), locationFilters)
+        );
+    }
+
+    private void refreshFiltersCount() {
+        int active = personaFilters.size() + bandFilters.size() + locationFilters.size();
+        filtersCountBadge.setText(String.valueOf(active));
+        filtersCountBadge.setVisible(active > 0);
     }
 
     // TreeSet for a stable, alphabetical chip order regardless of queue order; nulls/blanks
@@ -248,19 +357,29 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
                 chip.addClassName("bm-rev-chip--active");
             }
             chip.addClickListener(e -> {
+                // 2026-10-07 fix: this used to flip classes off the `active` boolean captured when
+                // the chip was BUILT, not the Set's state at CLICK time — so after the toggle below,
+                // `!active` kept evaluating to the same frozen value on every subsequent click,
+                // and the chip's highlight only ever turned on once, never back off. Re-reading
+                // activeFilters.contains(value) after the toggle (i.e. the real post-click state)
+                // instead of relying on the stale local is what actually fixes it.
+                boolean nowActive;
                 if (activeFilters.contains(value)) {
                     activeFilters.remove(value);
+                    nowActive = false;
                 } else {
                     activeFilters.add(value);
+                    nowActive = true;
                 }
                 page = 0;
                 applyFilters();
                 render();
-                // Full header/toolbar/filter-bar rebuild would also work, but is unnecessary here:
-                // only this one chip's active state changed, and re-rendering just it avoids
+                // Full header/toolbar/filters-panel rebuild would also work, but is unnecessary
+                // here: only this one chip's active state changed, and re-rendering just it avoids
                 // losing focus/scroll position on every click the way a full add()-replace would.
                 chip.setClassName("bm-rev-chip", true);
-                chip.setClassName("bm-rev-chip--active", !active);
+                chip.setClassName("bm-rev-chip--active", nowActive);
+                refreshFiltersCount();
             });
             group.add(chip);
         }
@@ -438,6 +557,13 @@ public class ReviewQueueView extends VerticalLayout implements BeforeEnterObserv
         btn.addThemeVariants(ButtonVariant.TERTIARY);
         btn.setEnabled(enabled);
         btn.addClickListener(e -> {
+            // 2026-10-08 fix: clicking the CURRENT page's own number button used to still run the
+            // full render(true) — re-rendering every row with the "new page loaded" fade animation
+            // even though nothing changed, which read as misleading (looked like the data had
+            // actually been reloaded). Nothing to do when the target is already the active page.
+            if (targetPage == page) {
+                return;
+            }
             page = targetPage;
             render(true);
             // Keep the address bar in sync with the in-memory page — same instance, no reload

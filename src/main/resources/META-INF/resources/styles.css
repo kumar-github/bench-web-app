@@ -502,17 +502,91 @@
 }
 
 /* ---- Supply/Demand grid density ----
-   2026-10-07: feedback that the Supply/Demand grids felt "too narrow/thin" — both views build every column with
-   setAutoWidth(true) and no flex-grow (see SupplyView/DemandView.buildGrid's Javadoc for the flex-grow half of this
-   fix), so rows packed to Aura's default --aura-base-size (16, i.e. "normal" density) with no breathing room. Bumped
-   to 18 (still inside Aura's documented 12-24 range, divisible-by-4-preferred) — scoped to `.bm-grid` rather than
-   set globally, so it affects only the grids this feedback was about (Supply, Demand), not Shortlist's grid or
-   anything else in the app. --aura-base-size is inherited, and a custom property set on a light-DOM host element
-   (plain `vaadin-grid.bm-grid` here, no shadow-piercing @CssImport needed) is inherited into that element's own
-   shadow DOM, where Aura's grid internals read it back out — see
-   https://vaadin.com/docs/latest/styling/themes/aura/other. */
+   2026-10-07: feedback that the Supply/Demand grids felt "too narrow/thin" — both grids build every column with
+   setAutoWidth(true) and no flex-grow (see SupplyDemandView.buildSupplyGrid/buildDemandGrid's Javadoc for the
+   flex-grow half of this fix — folded into one class from the former separate SupplyView/DemandView), so rows
+   packed to Aura's default --aura-base-size (16, i.e. "normal" density) with no breathing room. Bumped to 18 (still
+   inside Aura's documented 12-24 range, divisible-by-4-preferred) — scoped to `.bm-grid` rather than set globally, so
+   it affects only the grids this feedback was about (Supply, Demand), not Shortlist's grid or anything else in the
+   app. --aura-base-size is inherited, and a custom property set on a light-DOM host element (plain
+   `vaadin-grid.bm-grid` here, no shadow-piercing @CssImport needed) is inherited into that element's own shadow DOM,
+   where Aura's grid internals read it back out — see https://vaadin.com/docs/latest/styling/themes/aura/other. */
 vaadin-grid.bm-grid {
     --aura-base-size: 18;
+    /* Same min-height: 0 fix as .bm-sd-pane just below, and for the same reason — the Grid is
+       itself a flex-grow: 1 item inside its pane's own flex column (pane -> filter bar + grid), so
+       it's subject to the identical "won't shrink below intrinsic content height" default. Belt and
+       braces with .bm-sd-pane's fix: between the two, nothing in this chain can out-grow .bm-outlet
+       any more. */
+    min-height: 0;
+}
+
+.bm-sd-tabs {
+    margin-bottom: 4px;
+}
+
+/* 2026-10-08 fix: "always a vertical scrollbar on the Supply & Demand page, on top of the grid's
+   own scrollbar". SupplyDemandView's active pane (supplyPane/aafdPane/demandPane) is a flex item
+   (flex-grow: 1) inside the view's own column layout, containing a Grid.setSizeFull() — but flex
+   items default to min-height: auto, meaning a flex item won't shrink below its CONTENT's intrinsic
+   height even with flex-grow set. The Grid's own intrinsic/unclipped height (before virtualization
+   settles) was enough to push the pane, and so the whole view, a few pixels taller than .bm-outlet's
+   available height — which made .bm-outlet's own overflow-y: auto kick in too, on top of the Grid's
+   already-internal virtual scroll. min-height: 0 here is what actually lets the pane shrink to fit
+   the remaining flex space instead of growing to fit the Grid — same family of fix .bm-outlet's own
+   min-height: 0 already documents for a sibling case. */
+.bm-sd-pane {
+    min-height: 0;
+}
+
+/* ---- Flag chip (Supply/Demand page) ----
+   2026-10-07: replaces the old bare "⚠ Sub-capability mismatch" / "⚠ MAS mapping mismatch" text column. The chip
+   itself is always visible (no hover needed to notice a row is flagged).
+   2026-10-08: the original click-to-open-a-Dialog detail view was replaced with a plain hover Tooltip carrying the
+   same note text (SupplyDto.subCapabilityNote / DemandDto.masMappingNote) — see SupplyDemandView.flagChip's Javadoc
+   for the full reasoning. The chip is no longer clickable, so cursor: pointer below is gone too. */
+.bm-flag-chip-ok {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bm-faint-ink);
+    background: var(--bm-field-bg);
+    padding: 3px 9px;
+    border-radius: 999px;
+}
+
+.bm-flag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.bm-flag-chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* Amber = Supply's sub-capability mismatch, red = Demand's MAS-mapping mismatch — kept distinct rather than
+   sharing one color, matching the Review queue's own urgency palette convention (amber = caution, red = hard
+   issue) instead of inventing a third meaning. */
+.bm-flag-chip-amber {
+    background: var(--bm-amber-bg);
+    color: var(--bm-amber-ink-strong);
+}
+
+.bm-flag-chip-red {
+    background: var(--bm-red-bg);
+    color: var(--bm-red-ink);
 }
 
 .bm-queue-name {
@@ -676,7 +750,7 @@ vaadin-grid.bm-grid {
     font-weight: 600;
 }
 
-.bm-rev-toolbar {
+.bm-rev-toolbar-row {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -693,8 +767,22 @@ vaadin-grid.bm-grid {
     min-width: 220px;
 }
 
-.bm-rev-search input {
-    background: var(--bm-content-bg);
+/* 2026-10-08, take one (superseded by the comment below): the 2026-10-07 fix above changed the
+   WRONG token but also used the wrong SELECTOR — "input" is a light-DOM descendant selector, and
+   vaadin-text-field's real <input> lives inside the component's own shadow DOM (see the
+   near-identical shadow-DOM note left near .bm-avatar, for the Dashboard's old disabled search
+   field). A light-DOM selector can't reach in there at all, so ".bm-rev-search input" was a dead
+   rule the whole time. ::part(input-field) IS the correct way to reach a Vaadin field's internal box
+   from outside its shadow DOM — but take one then set it to --bm-field-bg (#f8f9fb), assuming that
+   was "the" input color every field on this page already used. It isn't: every OTHER field here
+   (the Persona/Band/Location filters on the Supply & Demand page, for instance) has no background
+   override at all and renders Aura's own default input fill, which is plain white — #f8f9fb is a
+   deliberately distinct, slightly darker token (see :root's comment) meant for other things (e.g.
+   the flag chips' "—" pill), not for matching a plain field to its siblings. So the box one shade
+   off from white WAS this rule, not Aura's default — take two below sets the part's background to
+   plain white explicitly, matching the native fill every other field on this page already has. */
+vaadin-text-field.bm-rev-search::part(input-field) {
+    background: #ffffff;
 }
 
 .bm-rev-flagged-filter {
@@ -715,23 +803,89 @@ vaadin-grid.bm-grid {
     white-space: nowrap;
 }
 
-/* Filter chips (Persona/Band/Location) + sort dropdown — added 2026-10-06. The approved mock
-   (Main.dc.html) showed these as static decoration with no filtering/sorting behind them; this
-   wires them to the real queue data instead of either faking a result or dropping the row the
-   mock called for. One chip group per dimension, multi-select within a group (OR), AND across
-   groups — same combinability as the existing search box + "Flagged for hiring only" checkbox. */
-.bm-rev-filterbar {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+/* Filter chips (Persona/Band/Location) — added 2026-10-06, wired to real queue data instead of
+   left as the approved mock's static decoration. One chip group per dimension, multi-select
+   within a group (OR), AND across groups — same combinability as the existing search box +
+   "Flagged for hiring only" checkbox.
+   2026-10-07: moved from three permanently-open rows above the list into the collapsed-by-default
+   .bm-rev-filters-panel below. Mocked up two ways before landing here — one "Filters" popover for
+   all three groups (this one) vs. three separate per-facet dropdown buttons — and picked this one
+   because narrowing the queue here is usually a multi-facet action ("Java, band E2.2, Hyderabad"),
+   which a single panel does in one open/close instead of three. Location stays a plain chip list
+   like Persona/Band for now; a searchable multi-select was mocked up too (for when the number of
+   distinct locations grows past what a chip row can hold) but deliberately deferred — revisit if
+   that list actually gets long enough to matter. */
+.bm-rev-filters-wrap {
+    position: relative;
+    flex-shrink: 0;
 }
 
-.bm-rev-chip-groups {
+.bm-rev-filters-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--bm-ink);
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.bm-rev-filters-btn:hover {
+    border-color: var(--bm-accent);
+}
+
+.bm-rev-filters-count {
+    background: var(--bm-navy);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 6px;
+    line-height: 1.4;
+}
+
+/* Position + box only — open/close is Component.setVisible(), which toggles the "hidden"
+   attribute. Without the [hidden] rule below, this class's own "display: flex" (author-origin,
+   same specificity as the browser's UA-stylesheet "[hidden] { display: none }") would win the
+   cascade tie and keep the panel visible even while hidden — the [hidden] variant must outrank
+   the plain class, which attaching the attribute selector to it does automatically. */
+.bm-rev-filters-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    width: 360px;
+    max-width: 80vw;
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
     display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bm-rev-filters-panel[hidden] {
+    display: none;
+}
+
+.bm-rev-filters-panel-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bm-rev-filters-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .bm-rev-chip-group {
@@ -1072,7 +1226,12 @@ vaadin-grid.bm-grid {
     min-width: 34px;
 }
 
-.bm-rev-page-btn:hover:not(:disabled) {
+/* 2026-10-08 fix: this rule's specificity (one class + two pseudo-classes) outranked
+   .bm-rev-page-btn--active's (one class), so hovering the CURRENT page's own button overrode its
+   dark background back to a light one while leaving --active's white text untouched — white text
+   on a light hover background, i.e. invisible. :not(.bm-rev-page-btn--active) excludes the active
+   button from this rule entirely; its own :hover rule right below keeps it dark+readable instead. */
+.bm-rev-page-btn:hover:not(:disabled):not(.bm-rev-page-btn--active) {
     background: var(--bm-field-bg);
 }
 
@@ -1086,6 +1245,10 @@ vaadin-grid.bm-grid {
     color: #ffffff;
     font-weight: 600;
     border-color: var(--bm-rev-cta);
+}
+
+.bm-rev-page-btn--active:hover {
+    background: var(--bm-rev-cta-hover);
 }
 
 /* ---- Demand Workspace candidate cards — "two states, four dimensions" rebuild, 2026-10-06.

@@ -29,7 +29,7 @@ public class DemandQueryService {
 
     /**
      * Full, unpaged list — unchanged, still backs the REST API (DemandController) and the matching engine. Not used by
-     * DemandView any more; see {@link #page}.
+     * DemandView any more (now SupplyDemandView's Demand tab); see {@link #page}.
      */
     @Transactional(readOnly = true)
     public List<DemandDto> list(String persona, String subPersona, String location, String classificationStatus, boolean activeOnly) {

@@ -10,7 +10,7 @@ import org.springframework.data.domain.Sort;
 import java.util.List;
 
 /**
- * Shared offset/limit/sort → Spring Data {@code Pageable} conversion for SupplyView's and DemandView's lazy grid data
+ * Shared offset/limit/sort → Spring Data {@code Pageable} conversion for SupplyDemandView's (both Supply and Demand tabs) lazy grid data
  * providers (added 2026-10-03 alongside {@code SupplyQueryService.page()}/{@code DemandQueryService.page()} — see those
  * classes' Javadoc for why the grids moved off loading every row on every refresh).
  * <p>

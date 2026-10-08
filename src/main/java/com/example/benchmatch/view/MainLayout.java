@@ -8,7 +8,6 @@ import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.RouterLayout;
 import com.vaadin.flow.router.RouterLink;
@@ -26,8 +25,10 @@ import java.util.Objects;
  * hooks to hit this mock's exact colors/spacing, so the shell here is plain {@code Div}s/ {@code RouterLink}s styled
  * from {@code styles.css} (".bm-*" classes), the same technique the mock itself uses (plain elements, inline styles).
  * <p>
- * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply, Demand, Review, Upload,
- * Shortlist. Review (added 2026-10-05 — demand-side queue + workspace, backed by the
+ * Nav items only link to routes that actually exist in this codebase today: Dashboard, Supply &amp; Demand, Review,
+ * Upload, Shortlist. "Supply &amp; Demand" is one nav item routing to one view ({@code SupplyDemandView}, a tabbed
+ * page) as of 2026-10-07 — it used to be two separate items/routes/views. Review (added 2026-10-05 — demand-side
+ * queue + workspace, backed by the
  * demand_candidate_decisions/decision_history tables) is the first of the three former "SOON" placeholders to get a
  * real view; Coverage Log and Admin still have none, so they render as the mock's disabled "navitem-static" treatment
  * with a SOON badge. "Shortlist" has no equivalent in the mock (it predates this view) — it reuses a plain custom list
@@ -64,9 +65,6 @@ public class MainLayout extends FlexLayout implements RouterLayout {
             "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'>"
                     + "<circle cx='9' cy='8' r='3.2'/><path d='M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6'/>"
                     + "<circle cx='17.5' cy='8.5' r='2.4'/><path d='M15.2 13.1c2.6.2 4.8 2.4 4.8 5.2'/></svg>";
-    private static final String ICON_DEMAND =
-            "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'>"
-                    + "<rect x='3' y='7' width='18' height='12' rx='1.6'/><path d='M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7'/></svg>";
     private static final String ICON_REVIEW =
             "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'>"
                     + "<rect x='3.5' y='3.5' width='17' height='17' rx='2.2'/><path d='M8 12.5l2.6 2.6L16.5 9'/></svg>";
@@ -132,8 +130,10 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         sidebar.add(logoRow);
 
         sidebar.add(navLink("Dashboard", ICON_DASHBOARD, DashboardView.class));
-        sidebar.add(navLink("Supply", ICON_SUPPLY, SupplyView.class));
-        sidebar.add(navLink("Demand", ICON_DEMAND, DemandView.class));
+        // 2026-10-07: Supply and Demand merged onto one tabbed page (see SupplyDemandView's
+        // Javadoc) — one sidebar entry now, instead of two, routing to /supply (its primary
+        // @Route); /demand still works too (its @RouteAlias) and lands on the Demand tab.
+        sidebar.add(navLink("Supply & Demand", ICON_SUPPLY, SupplyDemandView.class));
         sidebar.add(navLink("Review", ICON_REVIEW, ReviewQueueView.class));
         sidebar.add(soonItem("Coverage Log", ICON_COVERAGE));
         sidebar.add(navLink("Upload", ICON_UPLOAD, UploadView.class));
@@ -194,18 +194,13 @@ public class MainLayout extends FlexLayout implements RouterLayout {
         refreshedValue.addClassName("bm-last-refreshed-value");
         lastRefreshed.add(refreshedValue);
 
-        // The mock's search bar has no backing search feature yet, so it's shown disabled rather
-        // than a live-looking control that silently does nothing when used.
-        TextField search = new TextField();
-        search.setPlaceholder("Search employees, demands… (coming soon)");
-        search.setEnabled(false);
-        search.setWidth("260px");
-        search.addClassName("bm-search");
-
         Div avatar = new Div(new Span("RK"));
         avatar.addClassName("bm-avatar");
 
-        Div right = new Div(lastRefreshed, search, avatar);
+        // 2026-10-07: the mock's header search bar was dropped — no global search feature
+        // exists (or is planned yet) to back it, and a permanently-disabled "(coming soon)"
+        // control was judged not worth keeping around. Revisit if/when real search lands.
+        Div right = new Div(lastRefreshed, avatar);
         right.addClassName("bm-header-right");
 
         Div header = new Div(headerTitle, right);

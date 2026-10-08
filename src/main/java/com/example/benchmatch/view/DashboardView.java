@@ -115,7 +115,10 @@ public class DashboardView extends Div {
         Div titleBlock = new Div(title, subtitle);
         titleBlock.addClassName("bm-card-title-block");
 
-        RouterLink reviewLink = new RouterLink("Review in Supply →", SupplyView.class);
+        // 2026-10-07: SupplyView.class → SupplyDemandView.class (Supply merged with Demand onto one
+        // tabbed page); this link still lands on the Supply tab, same as before, since /supply is
+        // SupplyDemandView's primary @Route.
+        RouterLink reviewLink = new RouterLink("Review in Supply →", SupplyDemandView.class);
         reviewLink.addClassName("bm-pbtn");
 
         Div header = new Div(titleBlock, reviewLink);
@@ -193,7 +196,8 @@ public class DashboardView extends Div {
         Span open = new Span("Review →");
         open.addClassName("bm-queue-open");   // now a plain label, not its own link
 
-        RouterLink queueRow = new RouterLink(SupplyView.class);
+        // See buildNeedsAttentionCard's comment above — SupplyView.class → SupplyDemandView.class.
+        RouterLink queueRow = new RouterLink(SupplyDemandView.class);
         queueRow.add(avatar, nameLine, badge, open);
         queueRow.addClassName("bm-queue-row");
         return queueRow;
